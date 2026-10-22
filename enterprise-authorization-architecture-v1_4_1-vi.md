@@ -17,9 +17,9 @@ Các phụ lục ở cuối tài liệu: A (nhật ký thay đổi), B (ma trậ
 
 ### Phạm vi tài liệu và các mức bằng chứng
 
-Tài liệu này chứa nhiều loại nội dung. Chúng là những thứ khác nhau, và v1.4 gắn nhãn riêng cho từng loại để một đặc tả không bị nhầm là một hệ thống đã được kiểm chứng.
+Tài liệu này chứa nhiều loại nội dung. Chúng là những thứ khác nhau, và v1.4.1 gắn nhãn riêng cho từng loại để một đặc tả không bị nhầm là một hệ thống đã được kiểm chứng.
 
-| Mức | Ý nghĩa | Vị trí | Trạng thái trong v1.4 |
+| Mức | Ý nghĩa | Vị trí | Trạng thái trong v1.4.1 |
 |---|---|---|---|
 | Kiến trúc tham chiếu | Thành phần, trách nhiệm, bất biến, quyết định | Mục 1 đến 7, 9 đến 23, 26 | Đã đặc tả |
 | Đặc tả triển khai | Các hợp đồng đủ chính xác để hai nhóm xây dựng tương thích: kiểu dữ liệu, thuật toán, bảng, mã lỗi | Mục 8, 10 đến 15, 22, 23 | Đã đặc tả |
@@ -40,7 +40,7 @@ Từ vựng trạng thái dùng trong các bảng kiểm thử của mục 24: t
 |---|---|
 | 1.2 | Khôi phục mức cơ sở, thuật ngữ, sơ đồ, mô hình tenant, ví dụ minh họa, quy tắc HTTP, TOCTOU; sửa các điểm không nhất quán giữa lược đồ và thuật toán |
 | 1.3 | Thuật toán kết hợp, phân công vai trò platform và tenant, ngữ cảnh tin cậy, ma trận hành vi khi lỗi, FilterPlan, obligation, thao tác hàng loạt, các lớp sự kiện kiểm toán, bảng thu hồi, danh mục kiểm thử |
-| 1.4 | Bất biến về quyền sở hữu vai trò và tư cách thành viên, có thực thi ở cơ sở dữ liệu; ngữ nghĩa audit outbox; FilterPlan có kiểu với kiểm tra lúc chạy; hợp đồng HTTP cho tư cách thành viên tenant; thời gian ân hạn của cache khớp với SLA về độ cũ dữ liệu; không gian tên ngữ cảnh của quyền; các mức bằng chứng và kiểm thử tham chiếu đã thực thi (Phụ lục A) |
+| 1.4 | Bất biến về quyền sở hữu vai trò và tư cách thành viên, có thực thi ở cơ sở dữ liệu; ngữ nghĩa audit outbox; FilterPlan có kiểu với kiểm tra lúc chạy; hợp đồng HTTP cho tư cách thành viên tenant; thời gian ân hạn của cache khớp với SLA về độ cũ dữ liệu; không gian tên ngữ cảnh của quyền; các mức bằng chứng và kiểm thử tham chiếu đã thực thi (Phụ lục A.2) |
 | 1.4.1 | Bản sửa đổi khắc phục: trạng thái phân công được lưu trữ so với phân quyền hiệu lực (tạm ngưng, khôi phục, loại bỏ); các bảo đảm kiểm toán được giới hạn theo lớp sự kiện và ranh giới ghi tin cậy, với cơ chế ghi nhận kiểm toán ở mức cơ sở dữ liệu cho các thay đổi về tư cách thành viên và phân công; các kiểu FilterPlan được cụ thể hóa theo từng trường, trong khi kiểm tra lúc chạy vẫn là căn cứ có thẩm quyền; `ended_at` được thực thi bởi cơ sở dữ liệu; các ví dụ về quyền sở hữu vai trò, dữ liệu khởi tạo và cách đặt tên được làm nhất quán; ma trận bằng chứng và các kiểm tra được chạy lại (Phụ lục A.1) |
 
 
@@ -290,8 +290,8 @@ Quyền quản trị là chỗ dễ nhầm lẫn nhất giữa ý nghĩa tenant 
 | Khóa | Ngữ cảnh | Ý nghĩa | Rủi ro |
 |---|---|---|---|
 | `role.read` | TENANT | Đọc các vai trò và quyền của chúng có thể thấy trong tenant của ngữ cảnh | LOW |
-| `role.manage` | TENANT | Tạo, thay đổi, xóa vai trò tùy chỉnh của tenant và tập quyền của chúng | HIGH |
-| `user_role.assign` | TENANT | Tạo phân công vai trò tenant trong tenant của ngữ cảnh, trong giới hạn thẩm quyền của chính người cấp | HIGH |
+| `role.manage` | TENANT | Tạo, thay đổi, xóa vai trò tùy chỉnh của tenant và tập quyền của chúng, giới hạn trong các quyền mà người thực hiện đang nắm giữ (7.8) | HIGH |
+| `user_role.assign` | TENANT | Tạo phân công vai trò tenant trong tenant của ngữ cảnh, trong giới hạn thẩm quyền của chính người cấp (7.8) | HIGH |
 | `user_role.revoke` | TENANT | Thu hồi phân công vai trò tenant trong tenant của ngữ cảnh | HIGH |
 | `tenant_membership.manage` | TENANT | Thêm, tạm ngưng và loại bỏ tư cách thành viên trong tenant của ngữ cảnh | HIGH |
 | `authz.deny.manage` | TENANT | Tạo quy tắc từ chối tường minh (chỉ khi A1 được bật) | HIGH |
@@ -319,7 +319,7 @@ Quyền quản trị là chỗ dễ nhầm lẫn nhất giữa ý nghĩa tenant 
 
 | Tình huống | Kết quả | Cơ chế | Kiểm thử |
 |---|---|---|---|
-| Hành động không có trong danh mục | `INDETERMINATE / UNKNOWN_PERMISSION`; HTTP 500, cảnh báo (lỗi của bên gọi, không bao giờ là lỗi người dùng). Một bước build cũng phải kiểm tra rằng mọi hành động được khai báo trong mã đều tồn tại trong danh mục | Bước A4 của PDP (mục 11.3); kiểm tra CI | T-N03 |
+| Hành động không có trong danh mục | `INDETERMINATE / UNKNOWN_PERMISSION`; HTTP 500, cảnh báo (lỗi của bên gọi, không bao giờ là lỗi người dùng). Một bước build cũng phải kiểm tra rằng mọi hành động được khai báo trong mã đều tồn tại trong danh mục | Bước PA4 của PDP (mục 11.3); kiểm tra CI | T-N03 |
 | Quyền đã biết nhưng loại ngữ cảnh khác với loại ngữ cảnh của yêu cầu | `DENY / CONTEXT_KIND_MISMATCH` | Bước B3 của PDP | T-N04 |
 | Ánh xạ vai trò trộn lẫn ngữ cảnh (một vai trò tenant chứa quyền `platform.`) | Bị từ chối lúc ghi | `CHECK` trên `role_permissions` và khóa ngoại phức hợp (mục 8.3) | T-X10 (đã thực thi) |
 | Quyền đã ngừng sử dụng | Vẫn được đánh giá bình thường; việc sử dụng được đếm và ghi log | `deprecated_at` của danh mục | T-N05 |
@@ -354,7 +354,7 @@ Assignment scope: COMPANY / company-a
 
 Cập nhật một tài liệu:
 
-| Tài liệu | tenant | company | Kết quả |
+| Tài liệu | tenant | công ty | Kết quả |
 |---|---|---|---|
 | doc-1 | X | company-a | Được phép (trong phạm vi) |
 | doc-2 | X | company-b | Bị từ chối: ngoài phạm vi (404, vì Maya không có khả năng nhìn thấy mức đọc đối với tài liệu của company-b; mục 12) |
@@ -405,6 +405,17 @@ AND
 - Nếu hỗ trợ kế thừa vai trò: xác định quan hệ cha-con, ngăn chặn hoặc phát hiện chu trình, giới hạn độ sâu, xác định thứ tự ưu tiên và xử lý xung đột, xác định việc vô hiệu hóa cache khi cây phân cấp thay đổi, kiểm toán thay đổi phân cấp, và kiểm thử kế thừa nhiều cấp và chu trình.
 - Cả hai đều không thuộc mức cơ sở trừ khi có yêu cầu.
 
+### 7.8 Thẩm quyền định nghĩa vai trò và cấp vai trò [Cơ sở]
+
+Quy tắc: một principal chỉ được tạo hoặc thay đổi vai trò tùy chỉnh, hoặc tạo một phân công, trong phạm vi thẩm quyền mà nó đang thực sự nắm giữ. "Thẩm quyền của chính mình" chỉ có một định nghĩa ở đây: tập các cặp (quyền, phạm vi) mà các grant hiệu lực của principal (8.5.1) trao trong tenant của ngữ cảnh tại thời điểm thực hiện hành động.
+
+- **Định nghĩa vai trò (`role.manage`).** Một vai trò tùy chỉnh chỉ được chứa các quyền mà principal thực hiện đang nắm giữ hiệu lực. Không thể thêm một quyền mà người thực hiện không nắm giữ, dù người đó có `role.manage`.
+- **Phân công (`user_role.assign`).** Mỗi quyền của vai trò được phân công phải do người cấp nắm giữ, và phạm vi của phân công phải được phạm vi của người cấp bao phủ đối với từng quyền đó.
+- **Không tự cấp.** Một principal không thể tạo phân công cho chính mình. Việc tự cấp đòi hỏi một người phê duyệt thứ hai, khác người cấp, được ghi trong `approval_reference`.
+- **Vai trò mẫu dùng chung** chỉ được thay đổi bằng `platform.role.manage` (8.2.1).
+
+Bất biến: không chuỗi thao tác mức cơ sở nào cho phép một principal có được một cặp (quyền, phạm vi) mà trước đó không principal nào đang ở trạng thái hợp lệ nắm giữ. Cơ chế: PDP đánh giá quy tắc tập con trong cùng đường tin cậy như mọi quyết định khác (các endpoint quản lý vai trò và phân công gọi nó với tập quyền và phạm vi của vai trò làm thuộc tính tài nguyên). Kiểm thử: T-M19 đến T-M21 (chỉ mới đặc tả). Các cơ chế quản trị tùy chọn ở mục 21 bổ sung quy trình phê duyệt lên trên quy tắc này; chúng không thay thế quy tắc này.
+
 ---
 
 ## 8. Mô hình dữ liệu logic và các bất biến
@@ -439,14 +450,14 @@ Tầng: **B** = cơ sở, **O** = tùy chọn, **L** = giai đoạn sau.
 | `tenant_role_assignments` | B | PK `id`; duy nhất một phần (xem 8.4) | `tenant_id`; `(tenant_id, principal_id)` -> memberships; `(role_id, role_kind)` -> roles | `tenant_id NOT NULL`; vai trò phải thuộc loại `TENANT` và (do hệ thống định nghĩa hoặc thuộc sở hữu của cùng tenant), và tư cách thành viên phải là `ACTIVE` khi tạo phân công, cả hai được thực thi bằng trigger (8.3); các trường phạm vi theo 7.3; các trường vòng đời theo 7.5 |
 | `platform_role_assignments` | B | PK `id`; duy nhất một phần | `principal_id`; `(role_id, role_kind)` -> roles | **Không có `tenant_id`, không có phạm vi.** Vai trò phải thuộc loại `PLATFORM`. Bắt buộc có `approval_reference` |
 | `principal_permissions` | O (Phương án B) | PK `id` | như phân công tenant | Cấp quyền trực tiếp, chỉ ngữ cảnh tenant |
-| `principal_denies` | O (A1) | PK `id` | như phân công tenant | Từ chối tường minh, chỉ ngữ cảnh tenant; bắt buộc có `reason` và `approval_reference`; chỉ người nắm quyền rủi ro cao như `authz.deny.manage` mới được tạo |
+| `principal_denies` | O (A1) | PK `id` | như phân công tenant | Từ chối tường minh, chỉ ngữ cảnh tenant; bắt buộc có `reason` và `approval_reference`; chỉ người nắm quyền rủi ro cao `authz.deny.manage` mới được tạo |
 | `resource_relationships` | O | PK `id` | `tenant_id` | `(subject, relation, object)` với trạng thái và thời hạn hiệu lực; gắn với tenant |
 | `delegation_records` | O | PK `id` | `tenant_id`, actor, principal được đại diện | Các quyền/phạm vi được phép, thời hạn hiệu lực, trạng thái, `created_by` (chỉ khi ủy quyền được lưu trữ thay vì mang theo trong token) |
 | `support_sessions` | O | PK `id` | `tenant_id`, principal platform | Vai trò hạn chế, `approved_by`, thời hạn hiệu lực, trạng thái (mục 19) |
 | `catalog_versions` | L | PK `version` | - | `published_at`, `published_by`, `checksum` (mục 26) |
 | `authorization_change_events`, `access_decision_events`, `audit_outbox` | B | PK `event_id` | - | Mục 22. Sự kiện cho thay đổi tư cách thành viên và phân công được ghi bởi trigger của cơ sở dữ liệu (8.3, 22.6) |
 
-Quy tắc xuyên suốt: mọi bảng thuộc tenant đều mang `tenant_id NOT NULL`; dấu thời gian dùng UTC; ưu tiên xóa mềm hoặc thu hồi thay vì xóa hủy khi khả năng kiểm toán là quan trọng; `NULL`, trường bị thiếu và chuỗi rỗng không mang ý nghĩa khác nhau trừ khi tài liệu này nói vậy (ở đây, `NULL scope_id` chỉ có ý nghĩa với `TENANT` và `SELF`).
+Quy tắc xuyên suốt: mọi bảng thuộc tenant đều mang `tenant_id NOT NULL`; dấu thời gian dùng UTC; ưu tiên xóa mềm hoặc thu hồi thay vì xóa hủy khi khả năng kiểm toán là quan trọng; `NULL`, trường bị thiếu và chuỗi rỗng không mang ý nghĩa khác nhau trừ khi tài liệu này nói vậy (ở đây, `NULL scope_id` chỉ có ý nghĩa với `TENANT` và `SELF`; với mọi loại phạm vi khác, `scope_id` không rỗng, được thực thi bằng một `CHECK`).
 
 ### 8.2.1 Bất biến về quyền sở hữu vai trò
 
@@ -476,7 +487,7 @@ Quy tắc cho truy vấn và mã:
 
 Mỗi khóa vai trò được dùng trong ví dụ, kiểm thử hoặc dữ liệu khởi tạo thuộc đúng một loại trong 8.2.1. Khóa vai trò viết chữ thường.
 
-| Khóa vai trò | `role_kind` | `tenant_id` | `is_system_defined` | Loại | Dùng trong | Có trong dữ liệu khởi tạo |
+| Khóa vai trò | `role_kind` | `tenant_id` | `is_system_defined` | Nhóm | Dùng trong | Có trong dữ liệu khởi tạo |
 |---|---|---|---|---|---|---|
 | `platform_admin` | `PLATFORM` | NULL | true | Vai trò platform | 7.1, 27.4 | Có |
 | `tenant_admin` | `TENANT` | NULL | true | Vai trò mẫu dùng chung | 7.1 | Có |
@@ -496,7 +507,8 @@ Cần điều chỉnh cho các engine khác: `NULLS NOT DISTINCT` (PostgreSQL 15
 Những khoảng trống đã biết trong DDL này:
 
 - Chủ sở hữu cơ sở dữ liệu hoặc superuser có thể vô hiệu hóa trigger (`ALTER TABLE ... DISABLE TRIGGER`, `session_replication_role = replica`). DDL không thể ngăn điều đó; mục 22.6 nêu hệ quả và cơ chế phát hiện được đề xuất.
-- Các trigger kiểm toán chỉ ghi nhận sự kiện lớp A cho thay đổi tư cách thành viên và phân công. Các thay đổi lớp A khác (vai trò, quyền, phát hành chính sách và danh mục, phiên hỗ trợ, chuyển tài nguyên) phải được dịch vụ tin cậy ghi vào `audit_outbox` trong cùng giao dịch, điều mà DDL này không làm cho chúng.
+- Các trigger kiểm toán ghi nhận sự kiện lớp A cho các thay đổi trạng thái của tư cách thành viên và cho việc tạo phân công, thay đổi trạng thái phân công, và thay đổi ở bất kỳ cột nào khác (cửa sổ hiệu lực, phạm vi, vai trò, principal, tham chiếu phê duyệt). Chúng không ghi nhận `DELETE`; role ứng dụng tham chiếu không có đặc quyền `DELETE` hay `TRUNCATE`. Thiết lập `app.actor_id` do bên ghi **khẳng định**, không được xác thực: `actor_attributed = true` nghĩa là một actor đã được tuyên bố, và `db_user` ghi lại role đang kết nối.
+- Các thay đổi lớp A khác (vai trò, quyền, phát hành chính sách và danh mục, phiên hỗ trợ, chuyển tài nguyên) phải được dịch vụ tin cậy ghi vào `audit_outbox` trong cùng giao dịch, điều mà DDL này không làm cho chúng.
 - Hàng đợi cục bộ của lớp B, các sự kiện đọc/xuất của lớp C và relay không thuộc DDL này.
 - `created_by` và `revoked_by` không phải khóa ngoại; `updated_at` không được duy trì tự động; tác vụ dọn outbox chưa được định nghĩa; giả định mức cô lập READ COMMITTED (8.5).
 
@@ -603,6 +615,7 @@ CREATE TABLE tenant_role_assignments (
     REFERENCES tenant_memberships (tenant_id, principal_id),
   FOREIGN KEY (role_id, role_kind) REFERENCES roles (id, role_kind),
   CHECK ((scope_type IN ('TENANT','SELF')) = (scope_id IS NULL)),
+  CHECK (scope_id IS NULL OR scope_id <> ''),
   CHECK (valid_from IS NULL OR valid_until IS NULL OR valid_until > valid_from),
   CHECK ((status = 'REVOKED') = (revoked_at IS NOT NULL))
 );
@@ -616,7 +629,8 @@ CREATE UNIQUE INDEX uq_active_tenant_assignment
 -- audit capture below hold for every writer, including roles that have no privilege on the tables
 -- these functions touch (audit_outbox, tenant_memberships, tenant_role_assignments).
 
--- Role ownership and ACTIVE-membership invariants for tenant assignments (new assignments only).
+-- Role ownership and ACTIVE-membership invariants for tenant assignments (new assignments, and
+-- ACTIVE assignments whose principal or tenant changes).
 CREATE FUNCTION trg_tenant_assignment_integrity() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
@@ -641,7 +655,10 @@ BEGIN
 
   -- Only an ACTIVE membership may RECEIVE a new ACTIVE assignment. Stored assignments of a
   -- SUSPENDED membership are preserved but are not effective (see section 8.5).
-  IF NEW.status = 'ACTIVE' AND (TG_OP = 'INSERT' OR OLD.status <> 'ACTIVE') THEN
+  -- Also when an ACTIVE row is re-pointed to another principal or tenant (R1, R4).
+  IF NEW.status = 'ACTIVE' AND (TG_OP = 'INSERT' OR OLD.status <> 'ACTIVE'
+      OR NEW.principal_id IS DISTINCT FROM OLD.principal_id
+      OR NEW.tenant_id IS DISTINCT FROM OLD.tenant_id) THEN
     -- FOR SHARE blocks a concurrent membership status change until this transaction ends
     SELECT status INTO m_status FROM tenant_memberships
      WHERE tenant_id = NEW.tenant_id AND principal_id = NEW.principal_id
@@ -676,6 +693,14 @@ BEGIN
         USING ERRCODE = 'check_violation';
     END IF;
   ELSIF OLD.status = 'REMOVED' AND NEW.status <> 'REMOVED' THEN
+    -- stale ACTIVE assignments (left by a privileged bypass) must be revoked before reinstatement,
+    -- otherwise reinstatement would silently restore them
+    IF EXISTS (SELECT 1 FROM tenant_role_assignments
+                WHERE tenant_id = NEW.tenant_id AND principal_id = NEW.principal_id
+                  AND status = 'ACTIVE') THEN
+      RAISE EXCEPTION 'membership has ACTIVE assignments; revoke them before reinstatement'
+        USING ERRCODE = 'check_violation';
+    END IF;
     NEW.ended_at := NULL;
   END IF;
   RETURN NEW;
@@ -691,7 +716,8 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
   IF NEW.status = 'REMOVED' AND OLD.status <> 'REMOVED' THEN
     UPDATE tenant_role_assignments
-       SET status = 'REVOKED', revoked_at = now(), reason = 'MEMBERSHIP_ENDED'
+       SET status = 'REVOKED', revoked_at = now(), reason = 'MEMBERSHIP_ENDED',
+           revoked_by = NULLIF(current_setting('app.actor_id', true), '')::uuid
      WHERE tenant_id = NEW.tenant_id AND principal_id = NEW.principal_id
        AND status = 'ACTIVE';
   END IF;
@@ -723,6 +749,26 @@ CREATE TABLE platform_role_assignments (
 CREATE UNIQUE INDEX uq_active_platform_assignment
   ON platform_role_assignments (principal_id, role_id)
   WHERE status = 'ACTIVE';
+
+-- A revoked platform assignment is terminal, and the identity of an assignment never changes:
+-- the highest-privilege table gets the same protection as tenant assignments.
+CREATE FUNCTION trg_platform_assignment_integrity() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF OLD.status = 'REVOKED' AND NEW.status <> 'REVOKED' THEN
+    RAISE EXCEPTION 'a revoked assignment cannot be reactivated; create a new assignment'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  IF NEW.principal_id IS DISTINCT FROM OLD.principal_id
+     OR NEW.role_id IS DISTINCT FROM OLD.role_id THEN
+    RAISE EXCEPTION 'principal and role of a platform assignment are immutable; create a new assignment'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER platform_assignment_integrity
+  BEFORE UPDATE ON platform_role_assignments
+  FOR EACH ROW EXECUTE FUNCTION trg_platform_assignment_integrity();
 
 -- Audit outbox: lives in the same database as the data whose change it records.
 CREATE TABLE audit_outbox (
@@ -786,6 +832,13 @@ BEGIN
       'assignment_id', NEW.id, 'principal_id', NEW.principal_id,
       'tenant_id', to_jsonb(NEW) -> 'tenant_id',
       'old_status', OLD.status, 'new_status', NEW.status, 'assignment_reason', NEW.reason));
+  ELSIF to_jsonb(NEW) - 'status' - 'revoked_at' - 'revoked_by' - 'reason'
+        IS DISTINCT FROM to_jsonb(OLD) - 'status' - 'revoked_at' - 'revoked_by' - 'reason' THEN
+    -- any change to a security-relevant column (validity window, scope, role, principal,
+    -- approval reference) is a privilege change and is recorded with old and new values
+    PERFORM audit_emit(TG_TABLE_NAME || '.modified', jsonb_build_object(
+      'assignment_id', NEW.id, 'tenant_id', to_jsonb(NEW) -> 'tenant_id',
+      'old', to_jsonb(OLD), 'new', to_jsonb(NEW)));
   END IF;
   RETURN NULL;
 END $$;
@@ -803,6 +856,10 @@ REVOKE ALL ON audit_outbox FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION audit_emit(text, jsonb) FROM PUBLIC;
 GRANT SELECT, INSERT, UPDATE ON tenant_memberships, tenant_role_assignments TO authz_app;
 GRANT SELECT ON principals, tenants, permissions, roles, role_permissions TO authz_app;
+-- No DELETE and no TRUNCATE is granted on any table, so history cannot be removed by this role.
+-- Writes to roles and role_permissions (custom roles, 8.2.1) and to platform_role_assignments go
+-- through separate service roles (for example authz_role_admin, authz_platform_admin), created and
+-- granted per environment; they are not defined here because roles are cluster-level.
 ```
 
 Dữ liệu khởi tạo (các vai trò do hệ thống định nghĩa và danh mục tài liệu của 27.4; tệp đi kèm `authz_v1_4_1_reference_seed.sql`):
@@ -820,7 +877,7 @@ INSERT INTO permissions (id, key, context_kind, resource_type, action, risk_leve
   (gen_random_uuid(), 'user_role.assign',               'TENANT',   'user_role',         'assign',        'HIGH'),
   (gen_random_uuid(), 'user_role.revoke',               'TENANT',   'user_role',         'revoke',        'HIGH'),
   (gen_random_uuid(), 'tenant_membership.manage',       'TENANT',   'tenant_membership', 'manage',        'HIGH'),
-  (gen_random_uuid(), 'authz.deny.manage',              'TENANT',   'authz',             'deny.manage',   'HIGH'),
+  (gen_random_uuid(), 'authz.deny.manage',              'TENANT',   'authz.deny',        'manage',        'HIGH'),
   (gen_random_uuid(), 'authorization_audit.read',       'TENANT',   'authorization_audit','read',         'HIGH'),
   (gen_random_uuid(), 'platform.tenant.create',         'PLATFORM', 'tenant',            'create',        'HIGH'),
   (gen_random_uuid(), 'platform.tenant.suspend',        'PLATFORM', 'tenant',            'suspend',       'HIGH'),
@@ -862,7 +919,7 @@ Vì sao dùng hai bảng phân công thay vì một bảng với `tenant_id` có
 
 ### 8.4 Cấp lại và tính duy nhất
 
-Các partial unique index `uq_active_tenant_assignment` và `uq_active_platform_assignment` (mục 8.3) cho phép một phân công đã thu hồi được cấp lại dưới dạng một **dòng mới**, đồng thời ngăn hai dòng `ACTIVE` cho cùng principal, vai trò và phạm vi. Phân công đã thu hồi là trạng thái cuối: nó không thể được kích hoạt lại (trigger), nên lịch sử không bao giờ bị viết lại.
+Các partial unique index `uq_active_tenant_assignment` và `uq_active_platform_assignment` (mục 8.3) cho phép một phân công đã thu hồi được cấp lại dưới dạng một **dòng mới**, đồng thời ngăn hai dòng `ACTIVE` cho cùng principal, vai trò và phạm vi. Phân công đã thu hồi là trạng thái cuối: nó không thể được kích hoạt lại (trigger trên cả hai bảng phân công), nên lịch sử không bao giờ bị viết lại.
 
 `scope_id` là NULL đối với phạm vi `TENANT` và `SELF`, nên index của tenant cần `NULLS NOT DISTINCT` (PostgreSQL 15+, Giả định A8). Ở các phiên bản cũ hơn, dùng index biểu thức với `COALESCE(scope_id, '')` hoặc các partial index riêng. Partial index trên `ACTIVE` không ngăn các khoảng hiệu lực chồng lấn; nếu bạn cần cấp quyền theo lịch hoặc lịch sử, hãy định nghĩa riêng các quy tắc duy nhất theo thời gian. Kiểm thử: T-X14 (đã thực thi trong sandbox).
 
@@ -891,8 +948,8 @@ Do đó, một phân công được lưu là `ACTIVE` không nhất thiết có 
 | Tạm ngưng | `ACTIVE` sang `SUSPENDED` (có thể đảo ngược) | Vẫn `ACTIVE` | **Không**, trong thời gian tạm ngưng | Dịch vụ tin cậy; không lan truyền; cùng sự kiện vô hiệu hóa như khi loại bỏ (23.1) |
 | Khôi phục | `SUSPENDED` sang `ACTIVE` | Không đổi | Có, nếu vẫn hợp lệ (R3) | Dịch vụ tin cậy |
 | Loại bỏ | sang `REMOVED`; `ended_at` được đặt | Mọi phân công `ACTIVE` trở thành `REVOKED`, lý do `MEMBERSHIP_ENDED` | Không, vĩnh viễn | Trigger `AFTER UPDATE` `membership_ended`, cùng giao dịch |
-| Thêm lại sau khi loại bỏ | `REMOVED` sang `ACTIVE` (cùng dòng); `ended_at` bị xóa | Các phân công cũ vẫn `REVOKED` | Không, cho tới khi có cấp quyền mới | Dịch vụ tin cậy |
-| Tạo phân công khi đang `SUSPENDED` hoặc `REMOVED` | không đổi | Bị từ chối | - | Trigger `BEFORE INSERT` trên `tenant_role_assignments` (R1) |
+| Thêm lại sau khi loại bỏ | `REMOVED` sang `ACTIVE` (cùng dòng); `ended_at` bị xóa | Các phân công cũ vẫn `REVOKED`; bị từ chối nếu vẫn còn bất kỳ phân công `ACTIVE` nào | Không, cho tới khi có cấp quyền mới | Dịch vụ tin cậy; chốt chặn trong `membership_before` |
+| Tạo phân công khi đang `SUSPENDED` hoặc `REMOVED` | không đổi | Bị từ chối | - | Trigger `BEFORE INSERT OR UPDATE` trên `tenant_role_assignments` (R1) |
 
 Quyết định và lý do:
 
@@ -909,12 +966,12 @@ Kiểm tra này nằm trong một đường đánh giá duy nhất, không nằm
 | Tài nguyên đơn lẻ (`check`) | Bước B2 của PDP và tra cứu grant (8.7) |
 | Tập hợp hoặc danh sách (`resolveDataScope`) | Cùng tra cứu grant; không có grant hiệu lực sẽ cho ra plan `FALSE` và không truy vấn (13.2) |
 | Hàng loạt (`authorizeBulk`) | Suy ra từ cùng plan `resolveDataScope`, không bao giờ từ các quyết định đã cache cho từng phần tử (13.6) |
-| Tác vụ nền, tác vụ định kỳ, bên tiêu thụ thông điệp, xuất dữ liệu bất đồng bộ | Được đánh giá **khi công việc chạy**, không phải khi được đưa vào hàng đợi. Tác vụ mang `principalId` và `tenantId`, không bao giờ mang một quyết định tính sẵn. Tác vụ mà tư cách thành viên không còn `ACTIVE` sẽ bị từ chối và không được thử lại như thể được phép |
+| Tác vụ nền, tác vụ định kỳ, bên tiêu thụ thông điệp, xuất dữ liệu bất đồng bộ | Được đánh giá **khi tác vụ chạy**, không phải khi được đưa vào hàng đợi. Tác vụ mang `principalId` và `tenantId`, không bao giờ mang một quyết định tính sẵn. Tác vụ mà tư cách thành viên không còn `ACTIVE` sẽ bị từ chối và không được thử lại như thể được phép |
 | Tải xuống, xuất dữ liệu và mọi thao tác đọc khác trong phạm vi tenant | Qua cùng các điểm vào của PDP |
 
 Cache: việc chuyển ra khỏi `ACTIVE` (tạm ngưng hoặc loại bỏ) phát ra cùng một sự kiện vô hiệu hóa, nên các quyết định đã cache được xóa trong giới hạn độ cũ (23.1); ngoại lệ ân hạn tùy chọn không bao giờ phục vụ một mục đã bị sự kiện vô hiệu hóa xóa (23.3).
 
-Bằng chứng: thiết kế tham chiếu (bốn đường đi qua một điểm nghẽn duy nhất) đã được thực thi trong sandbox (T-M08 đến T-M12). Các đường riêng của sản phẩm chưa được kiểm chứng (T-M18).
+Bằng chứng: thiết kế tham chiếu (bốn đường đi qua một điểm kiểm soát duy nhất (choke point)) đã được thực thi trong sandbox (T-M08 đến T-M12). Các đường riêng của sản phẩm chưa được kiểm chứng (T-M18).
 
 #### 8.5.4 `ended_at`
 
@@ -987,7 +1044,7 @@ WHERE a.tenant_id = :context_tenant AND a.principal_id = :principal AND a.status
   AND (a.valid_until IS NULL OR :now < a.valid_until);
 ```
 
-Truy vấn chỉ đọc bảng phân công tenant. Grant platform đến từ `platform_role_assignments` và được chọn theo `context_kind`, không bao giờ trộn lẫn với các dòng này. `:now` phải đến từ đồng hồ của máy chủ (hoặc đồng hồ cơ sở dữ liệu) một cách nhất quán, không bao giờ từ client.
+Truy vấn không đọc bảng platform nào: nó chỉ dùng các bảng phân công tenant, tư cách thành viên và danh mục. Trạng thái principal (`principals.status`) và trạng thái tenant không thuộc truy vấn này; chúng được kiểm tra bởi các bước B1 và B2 của PDP. Grant platform đến từ `platform_role_assignments` và được chọn theo `context_kind`, không bao giờ trộn lẫn với các dòng này. `:now` phải đến từ đồng hồ của máy chủ (hoặc đồng hồ cơ sở dữ liệu) một cách nhất quán, không bao giờ từ client.
 
 ---
 
@@ -1096,7 +1153,8 @@ Chính sách và ràng buộc chỉ được dùng các thuộc tính đã đăn
 
 Quy tắc:
 
-- Một thuộc tính **bắt buộc** bị thiếu, sai định dạng hoặc không lấy được từ nguồn có thẩm quyền sẽ khiến kết quả là `INDETERMINATE` (nguyên nhân `MISSING_REQUIRED_ATTRIBUTE` hoặc `EVALUATION_FAILURE`). Không bao giờ gán cho nó một giá trị mặc định dễ dãi. Nó cũng phát ra cảnh báo, vì thường chỉ ra một lỗi dữ liệu.
+- Một dòng `principals` hoặc `tenant_memberships` vắng mặt là một **giá trị đã được định nghĩa**, không phải thuộc tính bị thiếu: nó cho ra `DENY / PRINCIPAL_INACTIVE` hoặc `DENY / NOT_A_MEMBER` (10.3, B1, B2).
+- Một thuộc tính **bắt buộc** bị thiếu, sai định dạng hoặc không lấy được từ nguồn có thẩm quyền sẽ khiến kết quả là `INDETERMINATE` (nguyên nhân `MISSING_REQUIRED_ATTRIBUTE` hoặc `EVALUATION_FAILURE`). Không bao giờ gán cho nó một giá trị mang tính cho phép theo mặc định. Nó cũng phát ra cảnh báo, vì thường chỉ ra một lỗi dữ liệu.
 - Một thuộc tính **tùy chọn** vắng mặt được coi là "không xác định"; mọi ràng buộc phụ thuộc vào nó đều đóng khi lỗi.
 - Phân biệt dữ liệu dùng cho logic nghiệp vụ với dữ liệu được phép dùng để biện minh cho quyền truy cập. Chỉ các dòng "dùng được trong chính sách" ở trên mới được dùng cho mục đích sau.
 - Các thuộc tính có thời hạn (chẳng hạn thời điểm xác thực) được kiểm tra đối chiếu với thời hạn đó.
@@ -1142,7 +1200,7 @@ type EvaluationResult = {
   reasonCode: ReasonCode;
   matchedGrantIds: string[];
   obligations: Obligation[];
-  filterPlan?: FilterPlan;
+  filterPlan?: AuthzPlan;         // AuthzPlan is defined in 13.2
   policyVersion: string;
   failedDependency?: string;
 };
@@ -1165,7 +1223,7 @@ type Decision = {
 | `ALLOW` | `ALLOW_GRANT` | `ALLOW` | false | Thực thi obligation, rồi tiếp tục | PDP, PEP, kiểm toán |
 | `DENY` | `OUT_OF_SCOPE`, `NOT_A_MEMBER`, `TENANT_SUSPENDED`, `TENANT_MISMATCH`, `PRINCIPAL_INACTIVE`, `CONTEXT_KIND_MISMATCH`, `CONSTRAINT_FAILED`, `EXPLICIT_DENY` | `DENY` | false | Từ chối; HTTP theo mục 12 | PDP, PEP (log), kiểm toán |
 | `NOT_APPLICABLE` | `NO_GRANT` | `DENY` | false | Từ chối; HTTP theo mục 12 | PDP, PEP (log), kiểm toán |
-| `INDETERMINATE` | `EVALUATION_FAILURE`, `MISSING_REQUIRED_ATTRIBUTE`, `UNKNOWN_PERMISSION` | `DENY` | true | Từ chối; 503 hoặc 500; cảnh báo | PDP, PEP (log), kiểm toán |
+| `INDETERMINATE` | `EVALUATION_FAILURE`, `MISSING_REQUIRED_ATTRIBUTE`, `UNKNOWN_PERMISSION` | `DENY` | true | Từ chối; 503 (phụ thuộc gặp sự cố) hoặc 500 (`UNKNOWN_PERMISSION` và các lỗi khác); cảnh báo | PDP, PEP (log), kiểm toán |
 
 Quy tắc:
 
@@ -1177,15 +1235,15 @@ Quy tắc:
 
 **Thuật toán được chọn: deny-overrides (từ chối thắng) đối với các ràng buộc bắt buộc (và đối với từ chối tường minh khi A1 được bật); ngoài ra cần có một cho phép tường minh.** Đánh giá ở mức cơ sở (chỉ dùng vai trò, không có từ chối tường minh), theo thứ tự sau:
 
-**Giai đoạn A: ngữ cảnh.**
-A1. Nếu xác thực không hợp lệ, dừng: 401 (không phải quyết định phân quyền).
-A2. Nếu yêu cầu sai định dạng, dừng: 400/422.
-A3. Dựng ngữ cảnh tin cậy. Nếu không lấy được một thuộc tính bắt buộc do phụ thuộc gặp sự cố hoặc lỗi, trạng thái = `INDETERMINATE`.
-A4. Kiểm tra rằng `action` là một khóa của danh mục quyền; nếu không, trạng thái = `INDETERMINATE / UNKNOWN_PERMISSION` (lỗi của bên gọi, mục 6.4).
+**Giai đoạn A: ngữ cảnh** (các bước PA1 đến PA4; tiền tố PA giúp phân biệt chúng với các Giả định A1 đến A16).
+PA1. Nếu xác thực không hợp lệ, dừng: 401 (không phải quyết định phân quyền).
+PA2. Nếu yêu cầu sai định dạng, dừng: 400/422.
+PA3. Dựng ngữ cảnh tin cậy. Nếu không lấy được một thuộc tính bắt buộc do phụ thuộc gặp sự cố hoặc lỗi, trạng thái = `INDETERMINATE`.
+PA4. Kiểm tra rằng `action` là một khóa của danh mục quyền; nếu không, trạng thái = `INDETERMINATE / UNKNOWN_PERMISSION` (lỗi của bên gọi, mục 6.4).
 
 **Giai đoạn B: bất biến** (tất cả đều phải đúng; thất bại ở đây là cuối cùng và không grant nào có thể ghi đè).
 B1. Principal tồn tại và là `ACTIVE`, nếu không thì `DENY / PRINCIPAL_INACTIVE`.
-B2. Với ngữ cảnh `TENANT`: tenant là `ACTIVE`, nếu không thì `DENY / TENANT_SUSPENDED`; tư cách thành viên là `ACTIVE`, nếu không thì `DENY / NOT_A_MEMBER`. Một lần tra cứu trả lời cả hai, và cả hai ánh xạ tới cùng một phản hồi HTTP (12.4). Một tư cách thành viên `SUSPENDED` bị từ chối ở đây dù các phân công đã lưu của nó vẫn là `ACTIVE` (8.5).
+B2. Với ngữ cảnh `TENANT`: tenant là `ACTIVE`, nếu không thì `DENY / TENANT_SUSPENDED`; tư cách thành viên là `ACTIVE`, hoặc một phiên hỗ trợ `ACTIVE`, chưa hết hạn gắn principal với tenant (mục 19), nếu không thì `DENY / NOT_A_MEMBER`. Một lần tra cứu trả lời cả hai, và cả hai ánh xạ tới cùng một phản hồi HTTP (12.4). Một tư cách thành viên `SUSPENDED` bị từ chối ở đây dù các phân công đã lưu của nó vẫn là `ACTIVE` (8.5).
 B3. Loại ngữ cảnh của quyền được yêu cầu bằng `contextKind`, nếu không thì `DENY / CONTEXT_KIND_MISMATCH`.
 B4. Với hành động trên thực thể: tenant của tài nguyên bằng `tenantId` (đã được bảo đảm bởi tra cứu có điều kiện theo tenant; không tìm thấy là "not found", được ánh xạ ở mục 12), nếu không thì `DENY / TENANT_MISMATCH`.
 
@@ -1200,7 +1258,7 @@ D1. Nếu tồn tại bất kỳ từ chối tường minh nào áp dụng đư�
 D2. Ngược lại, nếu bất kỳ tra cứu nào trong C thất bại: `INDETERMINATE / EVALUATION_FAILURE`.
 D3. Ngược lại, nếu không có grant: `NOT_APPLICABLE / NO_GRANT`.
 D4. Ngược lại, tính tập phạm vi hiệu lực (hợp của các phạm vi bao phủ, mục 9). Với hành động trên thực thể, nếu không grant nào bao phủ tài nguyên: `DENY / OUT_OF_SCOPE`. Với hành động trên tập hợp, tạo `FilterPlan` từ hợp đó.
-D5. Nếu bất kỳ ràng buộc bắt buộc nào thất bại: `DENY / CONSTRAINT_FAILED`.
+D5. Nếu bất kỳ ràng buộc bắt buộc nào thất bại: `DENY / CONSTRAINT_FAILED`. Với thao tác tập hợp hoặc hàng loạt không có một thể hiện tài nguyên đơn lẻ: các ràng buộc trên thuộc tính tài nguyên (trạng thái, phân loại) phải biểu diễn được dưới dạng predicate và được thêm vào `FilterPlan` bằng `AND`. Một ràng buộc không thể biểu diễn thành predicate của plan (SoD, quan hệ, kiểm tra theo từng thể hiện) được đánh giá theo từng mục, hoặc thao tác bị từ chối với `CONSTRAINT_FAILED`; nó không bao giờ bị bỏ qua.
 D6. Ngược lại `ALLOW / ALLOW_GRANT`.
 
 **Giai đoạn E: obligation.** Gộp các obligation từ grant, chính sách và ràng buộc đã khớp (mục 14). PEP xác minh rằng nó có thể thực thi mọi obligation bắt buộc; nếu không, nó từ chối với `OBLIGATION_UNSUPPORTED`.
@@ -1225,11 +1283,11 @@ Khi nhiều lý do có thể áp dụng, báo cáo lý do đầu tiên khớp th
 6. `OUT_OF_SCOPE`.
 7. `CONSTRAINT_FAILED`.
 
-Thứ tự này dùng cho việc báo cáo. Hiệu ứng là `DENY` trong mọi trường hợp; chỉ bản ghi kiểm toán, cảnh báo và ánh xạ HTTP là khác nhau.
+Thứ tự này dùng cho việc báo cáo. Kết quả (effect) là `DENY` trong mọi trường hợp; chỉ bản ghi kiểm toán, cảnh báo và ánh xạ HTTP là khác nhau.
 
 ### 11.5 Một đường đánh giá cho mọi đường truy cập
 
-Các Giai đoạn A đến E áp dụng y hệt cho kiểm tra tài nguyên đơn lẻ, phân giải phạm vi tập hợp, thao tác hàng loạt và việc thực thi công việc nền hoặc bất đồng bộ (bảng ở 8.5.3). Một tác vụ được đánh giá khi nó chạy, với principal và tenant mà nó mang theo; không đường nào được tái sử dụng quyết định đã tính lúc đưa vào hàng đợi hoặc đọc trực tiếp các phân công. Chưa có bằng chứng ở mức sản phẩm cho điều này (T-M18).
+Các Giai đoạn A đến E áp dụng y hệt cho kiểm tra tài nguyên đơn lẻ, phân giải phạm vi tập hợp, thao tác hàng loạt và việc thực thi tác vụ nền hoặc bất đồng bộ (bảng ở 8.5.3). Một tác vụ được đánh giá khi nó chạy, với principal và tenant mà nó mang theo; không đường nào được tái sử dụng quyết định đã tính lúc đưa vào hàng đợi hoặc đọc trực tiếp các phân công. Chưa có bằng chứng ở mức sản phẩm cho điều này (T-M18).
 
 ---
 
@@ -1277,6 +1335,9 @@ Quy tắc cho việc chọn tenant: gợi ý tenant là khẳng định của ch
 | Tenant tồn tại, principal không có tư cách thành viên | `DENY / NOT_A_MEMBER` | 403 | `tenant_access_denied` | Không gì cả |
 | Tư cách thành viên `SUSPENDED` hoặc `REMOVED` (kể cả bị loại bỏ trong khi đang có phiên) | `DENY / NOT_A_MEMBER` | 403 | `tenant_access_denied` | Không gì cả |
 | Chính tenant bị tạm ngưng | `DENY / TENANT_SUSPENDED` | 403 | `tenant_access_denied` | Không gì cả |
+| Principal không hoạt động hoặc bị vô hiệu hóa | `DENY / PRINCIPAL_INACTIVE` | 403 | `forbidden` | Không gì về tenant hay trạng thái principal ngoài "không được phép" |
+| Quyền đã biết thuộc loại ngữ cảnh khác | `DENY / CONTEXT_KIND_MISMATCH` | 403 | `forbidden` | Rằng hành động không được phép |
+| Ràng buộc bắt buộc thất bại trên một tài nguyên nhìn thấy được | `DENY / CONSTRAINT_FAILED` | 403 | `forbidden` | Rằng hành động không được phép |
 | Tài nguyên không tồn tại, hoặc thuộc tenant khác | không tìm thấy | 404 | `not_found` | Không gì cả |
 | Tài nguyên tồn tại trong tenant, principal không có khả năng nhìn thấy | `DENY` hoặc `NOT_APPLICABLE` | 404 | `not_found` | Không gì cả; giống hệt từng byte với dòng trước, ngoại trừ `correlationId` |
 | Tài nguyên nhìn thấy được, hành động không được phép | `DENY` hoặc `NOT_APPLICABLE` | 403 | `forbidden` | Rằng hành động không được phép |
@@ -1286,12 +1347,15 @@ Quy tắc cho việc chọn tenant: gợi ý tenant là khẳng định của ch
 | Tạo mới, tài nguyên cha nhìn thấy được nhưng hành động không được phép | `DENY` | 403 | `forbidden` | Rằng hành động không được phép |
 | `INDETERMINATE` (phụ thuộc gặp sự cố) | `INDETERMINATE` | 503 kèm `Retry-After` | `authorization_unavailable` | "Tạm thời không khả dụng"; được phép thử lại |
 | `INDETERMINATE` (lỗi, plan không hợp lệ, quyền không xác định) | `INDETERMINATE` | 500 | `internal_error` | Lỗi chung chung và correlation ID |
+| Obligation bắt buộc mà PEP không thể thực thi | `OBLIGATION_UNSUPPORTED` | 500 | `internal_error` | Lỗi chung chung và correlation ID; cảnh báo |
+| Ghi outbox kiểm toán lớp A thất bại nên thao tác bị rollback (mục 15, dòng 8a) | không phải kết quả đánh giá | 500 | `internal_error` | Lỗi chung chung và correlation ID; không có gì được commit |
+| Các phản hồi `tenant_access_denied` lặp lại bị giới hạn tần suất (12.4) | không đánh giá | 429 kèm `Retry-After` | `rate_limited` | Rằng bên gọi đang gửi quá nhiều yêu cầu |
 | Obligation xác thực tăng cường (step-up) bắt buộc chưa được đáp ứng | `ALLOW` với một obligation bắt buộc chưa được đáp ứng | Thử thách xác thực theo định nghĩa của hợp đồng API (401 hoặc 403, một lựa chọn cho mỗi API) | `step_up_required` | Rằng cần xác thực mạnh hơn |
 
 Quy tắc:
 
 - Dùng cùng một ánh xạ trên các endpoint tương đương (API, xuất dữ liệu, hàng loạt, kết quả tác vụ bất đồng bộ).
-- Thân phản hồi, mã lỗi, header và thời gian phản hồi không được phân biệt "không tìm thấy" với "không nhìn thấy được", và không được phân biệt bốn trường hợp con của tenant.
+- Thân phản hồi, mã lỗi và header không được phân biệt "không tìm thấy" với "không nhìn thấy được", và không được phân biệt bốn trường hợp con của tenant. Thời gian phản hồi không được làm cho cố định (12.4), nhưng không nhánh nào được thêm công việc cố ý mang tính phân biệt; nếu một lệnh gọi PDP xảy ra ở một đường thì nó cũng nên xảy ra (hoặc được mô phỏng) ở đường kia.
 - Không bao giờ trả về cho client danh mục vai trò, biểu thức chính sách, quyền của principal khác hay mã lý do. Lý do chi tiết nằm trong log có kiểm soát truy cập.
 - Kết quả `INDETERMINATE` không bao giờ được báo là 403 hoặc 404.
 - Mã HTTP không thay thế được phân quyền phía máy chủ.
@@ -1306,25 +1370,26 @@ Mọi thân phản hồi lỗi có cùng cấu trúc. `message` là một văn b
   "correlationId": "c-7f21" }
 ```
 
-| Mã | Thông điệp cố định (giữ nguyên chuỗi API; bản dịch trong ngoặc) | Trường bổ sung được phép |
+| Mã | Thông điệp cố định | Trường bổ sung được phép |
 |---|---|---|
-| `unauthenticated` | Authentication is required. (Cần xác thực.) | Header thử thách xác thực theo từng cơ chế |
-| `invalid_request` | The request is invalid. (Yêu cầu không hợp lệ.) | `details`: chỉ các trường không hợp lệ của chính client |
-| `invalid_filter` | The filter is invalid. (Bộ lọc không hợp lệ.) | `details`: chỉ các trường lọc không hợp lệ của chính client |
-| `tenant_access_denied` | Access to the requested tenant is not permitted. (Không được phép truy cập tenant được yêu cầu.) | Không có |
-| `forbidden` | You do not have permission to perform this action. (Bạn không có quyền thực hiện hành động này.) | Không có |
-| `not_found` | The requested resource was not found. (Không tìm thấy tài nguyên được yêu cầu.) | Không có |
-| `authorization_unavailable` | Authorization is temporarily unavailable. Retry later. (Phân quyền tạm thời không khả dụng. Vui lòng thử lại sau.) | Header `Retry-After` |
-| `internal_error` | An internal error occurred. (Đã xảy ra lỗi nội bộ.) | Không có |
-| `step_up_required` | Additional authentication is required. (Cần xác thực bổ sung.) | Thử thách xác thực theo định nghĩa của hợp đồng API |
+| `unauthenticated` | Authentication is required. | Header thử thách xác thực theo từng cơ chế |
+| `invalid_request` | The request is invalid. | `details`: chỉ các trường không hợp lệ của chính client |
+| `invalid_filter` | The filter is invalid. | `details`: chỉ các trường lọc không hợp lệ của chính client |
+| `tenant_access_denied` | Access to the requested tenant is not permitted. | Không có |
+| `forbidden` | You do not have permission to perform this action. | Không có |
+| `not_found` | The requested resource was not found. | Không có |
+| `authorization_unavailable` | Authorization is temporarily unavailable. Retry later. | Header `Retry-After` |
+| `rate_limited` | Too many requests. Retry later. | Header `Retry-After` |
+| `internal_error` | An internal error occurred. | Không có |
+| `step_up_required` | Additional authentication is required. | Thử thách xác thực theo định nghĩa của hợp đồng API |
 
 Bảo vệ chống dò liệt kê tenant:
 
 - Cùng mã trạng thái, mã lỗi, thông điệp và tập header cho bốn trường hợp con của tenant. Header phản hồi không được lặp lại gợi ý tenant, và thân phản hồi không bao giờ chứa id tenant.
 - Một lần tra cứu tư cách thành viên (10.3); không có truy vấn bổ sung hay nhánh mã riêng cho bất kỳ trường hợp con nào. Thời gian phản hồi không được làm cho cố định, nhưng không nhánh nào thực hiện thêm công việc mang tính phân biệt.
-- Giới hạn tần suất các phản hồi `tenant_access_denied` lặp lại theo từng principal và từng địa chỉ nguồn để làm chậm việc dò thử.
+- Giới hạn tần suất các phản hồi `tenant_access_denied` lặp lại theo từng principal và từng địa chỉ nguồn để làm chậm việc dò thử. Áp dụng cùng một giới hạn cho toàn bộ đường chọn tenant để phản hồi bị giới hạn (429 `rate_limited`) không phụ thuộc vào việc trường hợp con nào trong bốn trường hợp đã xảy ra.
 - Nguyên nhân thực sự (`NOT_A_MEMBER` hoặc `TENANT_SUSPENDED`) chỉ được ghi nhận trong sự kiện kiểm toán lớp B nội bộ.
-- Một tư cách thành viên bị loại bỏ trong khi đang có phiên sẽ có hiệu lực ở yêu cầu tiếp theo (token không mang thẩm quyền tenant). Các kết nối dài hạn gắn với một tenant phải kiểm tra lại tư cách thành viên ở mỗi thông điệp hoặc bị đóng khi có sự kiện vô hiệu hóa (mục 23).
+- Một tư cách thành viên bị loại bỏ trong khi đang có phiên được tôn trọng tối đa trong giới hạn độ cũ của 23.0 (60 giây trong vận hành bình thường) vì cache quyết định có thể vẫn phục vụ nó; các đường phải có hiệu lực ở yêu cầu kế tiếp (chọn tenant, quyền rủi ro `HIGH`) đọc tư cách thành viên không qua cache, trong khi bản thân token không mang thẩm quyền tenant. Các kết nối dài hạn gắn với một tenant phải kiểm tra lại tư cách thành viên ở mỗi thông điệp hoặc bị đóng khi có sự kiện vô hiệu hóa (mục 23).
 
 Phân biệt `tenant_access_denied` với `forbidden`: cả hai đều là 403, nhưng mã thứ nhất nghĩa là "bạn hoàn toàn không được hành động trong tenant đó" và mã thứ hai nghĩa là "bạn được hành động ở đó nhưng không được làm việc này". Điều này không tiết lộ gì về những tenant mà bên gọi không biết, vì mã thứ nhất giống hệt nhau với những tenant không tồn tại.
 
@@ -1337,16 +1402,17 @@ Phân biệt `tenant_access_denied` với `forbidden`: cả hai đều là 403, 
 - `check(request) -> Decision` cho tài nguyên đơn lẻ.
 - `resolveDataScope(request) -> DataScopeDecision` cho liệt kê, tìm kiếm, xuất dữ liệu.
 - `filterQuery(query, plan, tenantPredicate, userFilter)` trong tầng truy cập dữ liệu tin cậy.
-- `authorizeBulk(request, ids)` cho thao tác theo lô (13.5).
+- `authorizeBulk(request, ids)` cho thao tác theo lô (13.6).
 
 ```typescript
 type DataScopeDecision = {
   effect: "ALLOW" | "DENY";
   reasonCode: ReasonCode;
   evaluationFailed: boolean;
-  filterPlan?: FilterPlan;        // present iff effect = ALLOW
+  filterPlan?: AuthzPlan;         // present iff effect = ALLOW; AuthzPlan is defined below
   obligations: Obligation[];
   policyVersion: string;
+  correlationId: string;
 };
 ```
 
@@ -1479,8 +1545,8 @@ Không bao giờ chấp nhận đoạn SQL, hàm, biểu thức thô, văn bản
 
 | Nguồn gốc | Được kiểm tra | Lỗi | HTTP | Mã |
 |---|---|---|---|---|
-| Bộ lọc của người dùng (query string hoặc thân yêu cầu) | Tại ranh giới API đối chiếu với `usableInUserFilter`, và một lần nữa ở tầng truy cập dữ liệu | Lỗi phía client | 400 | `invalid_filter`, với `details` chỉ nêu các trường của chính client |
-| Plan phân quyền từ PDP | Ở tầng truy cập dữ liệu đối chiếu với `usableInAuthzPlan`, trước khi chuyển đổi | Lỗi phía máy chủ: kết quả là `INDETERMINATE`, không truy vấn nào được phát ra | 500 | `internal_error`, kèm cảnh báo |
+| Bộ lọc của người dùng (query string hoặc thân yêu cầu) | Tại ranh giới API đối chiếu với các trường có `user: true`, và một lần nữa ở tầng truy cập dữ liệu | Lỗi phía client tại ranh giới: 400 `invalid_filter`, với `details` chỉ nêu các trường của chính client. Một bộ lọc đã qua ranh giới nhưng thất bại ở lần kiểm tra thứ hai là lỗi phía máy chủ | 400 tại ranh giới; 500 ở lần kiểm tra thứ hai | `invalid_filter`; `internal_error` kèm cảnh báo |
+| Plan phân quyền từ PDP | Ở tầng truy cập dữ liệu đối chiếu với các trường có `authz: true`, trước khi chuyển đổi | Lỗi phía máy chủ: kết quả là `INDETERMINATE`, không truy vấn nào được phát ra | 500 | `internal_error`, kèm cảnh báo |
 | Kết hợp cuối cùng | Ở tầng truy cập dữ liệu | Thiếu điều kiện tenant: tầng này từ chối chạy truy vấn | 500 | `internal_error`, kèm cảnh báo |
 
 #### Ngữ nghĩa
@@ -1501,7 +1567,7 @@ tenantPredicate AND authzFilterPlan AND userFilter
 
 - `tenantPredicate` được tầng truy cập dữ liệu chèn vào từ `TrustedContext.tenantId` cho mọi truy vấn trên bảng thuộc tenant, **độc lập với `FilterPlan`**. Plan không thể loại bỏ hay ghi đè nó. Tầng dữ liệu từ chối chạy truy vấn trên bảng thuộc tenant nếu thiếu nó (T-P12).
 - `authzFilterPlan` đến từ `resolveDataScope`.
-- `userFilter` được kiểm tra đối chiếu với các trường và toán tử `usableInUserFilter`; nó chỉ có thể thu hẹp kết quả.
+- `userFilter` được kiểm tra đối chiếu với các trường có `user: true` và các toán tử của chúng; nó chỉ có thể thu hẹp kết quả.
 - Nếu một predicate bảo mật bắt buộc không thể được tạo ra hoặc áp dụng, không trả về gì và thất bại theo mục 15. Không bao giờ quay lui về một truy vấn không lọc.
 
 ### 13.4 Phân trang, sắp xếp, tổng hợp
@@ -1520,12 +1586,15 @@ Maya nắm `editor` tại `TEAM team-17` và `TEAM team-22` trong tenant X và g
 ```json
 {
   "effect": "ALLOW",
+  "reasonCode": "ALLOW_GRANT",
+  "evaluationFailed": false,
   "filterPlan": {
     "kind": "PREDICATE",
     "predicate": { "field": "team_id", "operator": "IN", "values": ["team-17", "team-22"] }
   },
   "obligations": [],
-  "policyVersion": "2026.10.1"
+  "policyVersion": "2026.10.1",
+  "correlationId": "c-7f20"
 }
 ```
 
@@ -1542,7 +1611,7 @@ LIMIT $4;
 -- $1 = 'X', $2 = ['team-17','team-22'], $3 = 'ACTIVE', $4 = 50
 ```
 
-Nếu plan là `FALSE`, phản hồi là một trang rỗng và không cần truy vấn. Nếu người dùng cung cấp `tenant_id` trong bộ lọc, nó bị từ chối (không có trong `usableInUserFilter`) và điều kiện tenant không thay đổi.
+Nếu plan là `FALSE`, phản hồi là một trang rỗng và không cần truy vấn. Nếu người dùng cung cấp `tenant_id` trong bộ lọc, nó bị từ chối (không phải trường `user: true`) và điều kiện tenant không thay đổi.
 
 ### 13.6 Thao tác hàng loạt (Giả định A9)
 
@@ -1584,6 +1653,10 @@ POST /documents:bulk-archive
 
 `NOT_FOUND` cũng là kết quả mà một ID thuộc tenant khác hoặc không nhìn thấy được trả về; `FAILED` nghĩa là phần tử không thể được đánh giá hoặc xử lý và có thể thử lại.
 
+Hàng loạt là một ngoại lệ có chủ đích, được ghi nhận, đối với dòng `403 forbidden` "nhìn thấy được nhưng không được phép" ở 12.3: lô được phân quyền từ một plan dạng tập hợp, vốn không tách khả năng nhìn thấy khỏi hành động, nên mọi phần tử nằm ngoài tập được phân quyền đều được báo là `NOT_FOUND`. Một endpoint cần phân biệt 403 phải đánh giá khả năng nhìn thấy riêng bằng plan ở mức đọc.
+
+Plan chỉ mang các predicate. Các ràng buộc bắt buộc theo từng thể hiện (SoD, kiểm tra quan hệ, các ràng buộc không thể viết thành predicate, step-up và các obligation khác) được đánh giá theo từng phần tử hoặc theo từng lô trước khi xử lý, như nêu ở bước D5 của 11.3; chúng không bao giờ bị bỏ qua chỉ vì plan đã cho phép phần tử đó.
+
 ---
 
 ## 14. Obligation (nghĩa vụ) [Tùy chọn]
@@ -1597,7 +1670,7 @@ type ObligationBase = { mandatory: boolean };
 
 type Obligation = ObligationBase & (
   | { type: "ALLOWED_FIELDS"; fields: string[] }           // whitelist of fields that may be returned
-  | { type: "REQUIRE_STEP_UP_AUTH"; maxAgeSeconds: number }
+  | { type: "REQUIRE_STEP_UP_AUTH"; minAssurance: AssuranceLevel; maxAgeSeconds: number }
   | { type: "REQUIRE_JUSTIFICATION" }
   | { type: "WATERMARK_EXPORT" }
 );
@@ -1609,7 +1682,7 @@ type Obligation = ObligationBase & (
 
 | Obligation | Được thực thi bởi | Khi nào |
 |---|---|---|
-| `REQUIRE_STEP_UP_AUTH` | PEP | Trước mọi truy cập dữ liệu; so sánh `authentication.assuranceLevel` và `authenticatedAt` với `maxAgeSeconds` |
+| `REQUIRE_STEP_UP_AUTH` | PEP | Trước mọi truy cập dữ liệu; so sánh `authentication.assuranceLevel` với `minAssurance` và `authenticatedAt` với `maxAgeSeconds` |
 | `REQUIRE_JUSTIFICATION` | PEP / dịch vụ | Trước khi truy cập hoặc thay đổi dữ liệu; được ghi vào kiểm toán |
 | `ALLOWED_FIELDS` | Tầng truy cập dữ liệu (phép chiếu) và bộ tuần tự hóa (tuyến phòng thủ thứ hai) | Tại phép chiếu của truy vấn và lúc tuần tự hóa, để các trường bị loại không bao giờ được lấy ra khi có thể tránh |
 | `WATERMARK_EXPORT` | Dịch vụ xuất dữ liệu | Khi tạo bản xuất |
@@ -1619,25 +1692,25 @@ type Obligation = ObligationBase & (
 - Obligation bắt buộc mà PEP không thể thực thi: từ chối (`OBLIGATION_UNSUPPORTED`); hành động không được thực thi và không dữ liệu nào được trả về. Không bao giờ bỏ qua nó mà trả về `ALLOW`.
 - Obligation khuyến nghị mà PEP không nhận diện được: tiếp tục, và tăng một chỉ số đo.
 - Gửi obligation cho client không phải là thực thi.
-- **Quy tắc gộp** khi nhiều chính sách cùng đóng góp: `ALLOWED_FIELDS` -> giao của các danh sách trường; `REQUIRE_STEP_UP_AUTH` -> `maxAgeSeconds` nhỏ nhất; `REQUIRE_JUSTIFICATION` và `WATERMARK_EXPORT` -> có mặt nếu bất kỳ bên đóng góp nào yêu cầu; nếu không thể gộp (ví dụ giao rỗng khiến phản hồi vô nghĩa) thì PEP từ chối.
-- **Không rò rỉ:** một trường bị `ALLOWED_FIELDS` loại bỏ phải vắng mặt ở mọi đường phản hồi: phản hồi thông thường, thân lỗi, đoạn trích và phần tô sáng của tìm kiếm, bản xuất, cache phản hồi, webhook và payload kiểm toán.
+- **Quy tắc gộp** khi nhiều chính sách cùng đóng góp: `ALLOWED_FIELDS` -> giao của các danh sách trường; `REQUIRE_STEP_UP_AUTH` -> `minAssurance` nghiêm ngặt nhất và `maxAgeSeconds` nhỏ nhất; cờ `mandatory` sau khi gộp là true nếu bất kỳ bên đóng góp nào là bắt buộc; `REQUIRE_JUSTIFICATION` và `WATERMARK_EXPORT` -> có mặt nếu bất kỳ bên đóng góp nào yêu cầu; nếu không thể gộp (ví dụ giao rỗng khiến phản hồi vô nghĩa) thì PEP từ chối.
+- **Không rò rỉ:** một trường bị `ALLOWED_FIELDS` loại bỏ phải vắng mặt ở mọi đường phản hồi: phản hồi thông thường, thân lỗi, đoạn trích và phần tô sáng của tìm kiếm, bản xuất, cache phản hồi, webhook và payload kiểm toán. Bộ lọc, sắp xếp, tổng hợp và facet của người dùng chỉ được dùng các trường mà `ALLOWED_FIELDS` cho phép, để một trường bị loại bỏ không thể bị suy ra từ thứ tự kết quả, số đếm hay việc lọc.
 - Các obligation phụ thuộc vào việc quyết định dòng nào được nhìn thấy không thay thế cho việc lọc dòng.
 
 ---
 
 ## 15. Ma trận hành vi khi lỗi [Cơ sở]
 
-Quy tắc chung: không có lỗi dữ liệu phân quyền nào được tạo ra một cho phép; lỗi telemetry không bao giờ chặn yêu cầu; lỗi kiểm toán tuân theo lớp sự kiện (mục 22). Mọi sự từ chối đều dừng tại PEP, trước khi dịch vụ hoặc cơ sở dữ liệu được gọi, trừ khi có nêu khác.
+Quy tắc chung: không có lỗi dữ liệu phân quyền nào tạo ra một quyết định cho phép; lỗi telemetry không bao giờ chặn yêu cầu; lỗi kiểm toán tuân theo lớp sự kiện (mục 22). Mọi sự từ chối đều dừng tại PEP, trước khi dịch vụ hoặc cơ sở dữ liệu được gọi, trừ khi có nêu khác.
 
 | # | Phụ thuộc / lỗi | Ảnh hưởng tới việc đánh giá | Hành vi bắt buộc | Yêu cầu có tiếp tục? | Dùng được cache? | Kiểm toán / telemetry | Thử lại / phục hồi |
 |---|---|---|---|---|---|---|---|
-| 1 | PDP hoặc policy engine từ xa không khả dụng | Không có quyết định | Từ chối; 503. Dịch vụ và cơ sở dữ liệu không được gọi | Không | Không dùng *cho phép* đã cache; ngoại lệ chỉ ở 23.3 | Sự kiện lớp B, cảnh báo theo tần suất | Một lần thử lại có giới hạn cho lời gọi quyết định; circuit breaker; tự phục hồi |
+| 1 | PDP hoặc policy engine từ xa không khả dụng | Không có quyết định | Từ chối; 503. Dịch vụ và cơ sở dữ liệu không được gọi | Không | Không dùng *cho phép* đã cache vượt quá các giới hạn độ cũ (23.1); ngoại lệ chỉ ở 23.3 | Sự kiện lớp B, cảnh báo theo tần suất | Một lần thử lại có giới hạn cho lời gọi quyết định; circuit breaker; tự phục hồi |
 | 2 | Kho chính sách hoặc gói chính sách không đọc được | PDP không nạp được quy tắc | Nếu một gói đã kiểm tra hợp lệ đã được nạp, tiếp tục dùng nó trong giới hạn độ cũ của chính sách (23.1). Nếu không có gói hợp lệ (lúc khởi động), PDP chưa sẵn sàng: từ chối tất cả | Chỉ khi đã nạp gói hợp lệ | Không áp dụng | Cảnh báo; ghi log phiên bản gói đang dùng | Thử tải lại với backoff; rollback về phiên bản hợp lệ gần nhất |
-| 3 | Cơ sở dữ liệu phân quyền (phân công, vai trò, quyền) không khả dụng | Không xác định được grant | `INDETERMINATE`; 503 | Không | Chỉ được đọc cache trong giới hạn độ cũ (23.1); mục hết hạn coi như miss | Sự kiện lớp B; cảnh báo | Phục hồi khi DB trở lại; không cho phép thủ công |
+| 3 | Cơ sở dữ liệu phân quyền (phân công, vai trò, quyền) không khả dụng | Không xác định được grant | `INDETERMINATE`; 503 | Không khi cache miss | Một lần cache hit trong giới hạn độ cũ (23.1) là vận hành bình thường và được phục vụ, nên yêu cầu vẫn tiếp tục; một lần miss hoặc một mục đã hết hạn không thể nạp lại và bị từ chối | Sự kiện lớp B; cảnh báo | Phục hồi khi DB trở lại; không cho phép thủ công |
 | 4 | Dịch vụ tư cách thành viên / quan hệ không khả dụng | Không xác minh được tư cách thành viên hoặc quan hệ | `INDETERMINATE` cho các thao tác cần đến nó; 503. Các thao tác không phụ thuộc vào nó không bị ảnh hưởng | Không (với thao tác phụ thuộc) | Giống dòng 3 | Sự kiện lớp B; cảnh báo | Backoff; phục hồi |
 | 5 | `resolveDataScope()` thất bại | Không có plan | `DataScopeDecision` = `DENY` với `evaluationFailed`; 503. **Không truy vấn nào được phát ra** | Không | Không | Sự kiện lớp B; cảnh báo | Thử lại lời gọi; không bao giờ dựng bộ lọc tạm thời |
 | 6 | `FilterPlan` không hợp lệ hoặc không chuyển đổi được | Lỗi | `INDETERMINATE`; 500; **không truy vấn nào được phát ra** | Không | Không | Cảnh báo (P1: lỗi); correlation ID | Sửa mã/chính sách; rollback phiên bản |
-| 7 | Obligation bắt buộc không thể thực thi | Lỗi ở mức PEP | Từ chối; hành động không chạy; dữ liệu đã lấy bị loại bỏ và không bao giờ được tuần tự hóa | Không | Không | Sự kiện lớp B `OBLIGATION_UNSUPPORTED`; cảnh báo | Sửa PEP hoặc chính sách; rollback |
+| 7 | Obligation bắt buộc không thể thực thi | Lỗi ở mức PEP | Từ chối; 500 `internal_error`; hành động không chạy; dữ liệu đã lấy bị loại bỏ và không bao giờ được tuần tự hóa | Không | Không | Sự kiện lớp B `OBLIGATION_UNSUPPORTED`; cảnh báo | Sửa PEP hoặc chính sách; rollback |
 | 8a | Ghi outbox thất bại (không ghi được bảng kiểm toán trong chính cơ sở dữ liệu của dữ liệu, kể cả khi trigger kiểm toán của 22.6 không ghi được) | Không ghi nhận được sự kiện bắt buộc | Lớp A: toàn bộ giao dịch bị rollback, kể cả một thay đổi tư cách thành viên hoặc phân công có trigger kiểm toán thất bại (T-U13); thay đổi dữ liệu lớp C: rollback; đọc hoặc xuất lớp C: không dữ liệu nào được trả ra. Phản hồi 500 `internal_error`. Không có gì được commit | Không | Không áp dụng | Cảnh báo; được đếm | Bên gọi có thể thử lại toàn bộ thao tác |
 | 8b | Sink kiểm toán phía sau hoặc relay không khả dụng (các dòng outbox đã được commit) | Không ảnh hưởng tới quyết định hay thay đổi đã commit | Thay đổi nghiệp vụ **vẫn được commit**; các thao tác lớp C tiếp tục vì sự kiện của chúng đã bền vững; relay thử lại; sự kiện lớp B vẫn nằm trong hàng đợi cục bộ bền vững; sự kiện lớp D bị loại bỏ và được đếm (chỉ lớp D được phép mất) | Có | Không áp dụng | Chỉ số tuổi và độ sâu tồn đọng; cảnh báo ở 5 phút (cảnh báo) và 30 phút (nghiêm trọng), A11 | Relay thử lại với backoff lũy thừa và jitter; at-least-once; sink khử trùng lặp theo `event_id`; các dòng `PENDING` không bao giờ bị dọn |
 | 8c | Hàng đợi cục bộ lớp B không nhận được sự kiện (hàng đợi đầy hoặc lỗi lưu trữ) | Không ảnh hưởng tới quyết định | Sự từ chối vẫn giữ nguyên (yêu cầu đã bị từ chối). Sự kiện bị **mất**: đây là trường hợp mất sự kiện lớp B duy nhất được chấp nhận; `audit_events_lost_total` được tăng và một cảnh báo được phát ra | Có (đã bị từ chối) | Không áp dụng | Cảnh báo; được đếm | Khôi phục dung lượng hàng đợi; sự kiện đã mất không thể khôi phục |
@@ -1701,7 +1774,9 @@ WHERE id = :document_id
   AND team_id = ANY(:authorized_team_ids);
 ```
 
-Luôn kiểm tra số dòng bị ảnh hưởng. Không dòng nào nghĩa là tài nguyên không còn thỏa mãn các điều kiện; một câu lệnh thành công không phải là bằng chứng rằng việc cập nhật đã xảy ra.
+Predicate ở trên bắt được thay đổi của **tài nguyên** (nó đã chuyển sang team khác). Nó không bắt được thay đổi của **grant** (phân công bị thu hồi, hoặc tư cách thành viên bị loại bỏ, sau lần kiểm tra). Với các thao tác ghi có rủi ro `HIGH`, hãy kiểm tra lại grant trong cùng giao dịch: ghép truy vấn grant hiệu lực của 8.7 vào predicate (hoặc đọc nó bằng `SELECT ... FOR SHARE` trước khi ghi), hoặc so sánh epoch phân quyền của principal-và-tenant (23.2) với giá trị đã dùng cho quyết định.
+
+Luôn kiểm tra số dòng bị ảnh hưởng. Không dòng nào nghĩa là tài nguyên không còn thỏa mãn các điều kiện, hoặc grant không còn hiệu lực; một câu lệnh thành công không phải là bằng chứng rằng việc cập nhật đã xảy ra. Trả về 409 `conflict` (trạng thái đã thay đổi) và đánh giá lại khi thử lại; nếu lần thử lại bị từ chối, áp dụng ánh xạ của 12.3.
 
 ### 17.2 Chuyển tài nguyên giữa các phạm vi [Tùy chọn]
 
@@ -1742,14 +1817,14 @@ Quy tắc:
 **Truy cập hỗ trợ xuyên tenant (Giả định A2).** Nhân viên platform không có quyền truy cập mặc nhiên vào dữ liệu tenant. Để làm việc trong một tenant, họ mở một **phiên hỗ trợ** (`support_sessions`):
 
 - Yêu cầu một quyền platform như `platform.tenant.support_access`, một phê duyệt hoặc lý do biện minh, và thời hạn ngắn.
-- Phiên gắn với một tenant và một vai trò hạn chế; việc đánh giá sau đó chạy trong ngữ cảnh `TENANT` nơi actor là principal platform và các quyền hiệu lực chỉ là của vai trò thuộc phiên.
+- Phiên gắn với một tenant, một principal platform và một vai trò hạn chế. Việc đánh giá sau đó chạy trong ngữ cảnh `TENANT` nơi `principalId` và `actorId` đều là principal platform, `tenantId` là tenant của phiên, và ngữ cảnh tin cậy mang `supportSessionId`. Các quyền hiệu lực chỉ là của vai trò thuộc phiên. Một principal platform không có dòng `tenant_memberships`, nên bước B2 của 11.3 chấp nhận, thay cho tư cách thành viên `ACTIVE`, một phiên hỗ trợ `ACTIVE` gắn với `(tenantId, principalId)` chưa hết hạn hoặc bị thu hồi, được kiểm tra với `support_sessions` ở mọi yêu cầu; nếu không có phiên như vậy thì kết quả là `DENY / NOT_A_MEMBER`.
 - Giao diện hiển thị trạng thái hỗ trợ cho người dùng của tenant khi phù hợp; phiên có thể được kết thúc và thu hồi bất cứ lúc nào.
 - Kiểm toán (lớp A cho mở/đóng, lớp C cho hành động): actor thực sự, tenant, tham chiếu phê duyệt và các hành động đã thực hiện. Không bao giờ thay actor gốc bằng một người dùng khác.
 - Xem xét sau khi sử dụng.
 
 **Mạo danh một người dùng** (hành động với tư cách người dùng đó) là một biến thể nghiêm ngặt hơn: có giới hạn thời gian, được phê duyệt, được đánh dấu rõ ràng, giới hạn các hành động được phép, và được kiểm toán với cả actor thực sự lẫn principal bị mạo danh. Nó không bao giờ vượt qua cô lập tenant hay các bất biến khác.
 
-**Break-glass:** có giới hạn thời gian, xác thực mạnh, có cảnh báo, được xem xét và được ghi log.
+**Break-glass:** có giới hạn thời gian, xác thực mạnh, có cảnh báo, được xem xét và được ghi log. Các lớp kiểm toán (22.1): kích hoạt, hủy kích hoạt, và bắt đầu và kết thúc mạo danh là lớp A; các hành động thay đổi trạng thái trong bất kỳ phiên nào trong số này là lớp C thay đổi dữ liệu; các thao tác đọc và xuất trong các phiên đó là lớp C đọc hoặc xuất.
 
 Những năng lực này có thể hoãn lại, nhưng ADR nên coi chúng là các năng lực riêng biệt.
 
@@ -1758,6 +1833,7 @@ Những năng lực này có thể hoãn lại, nhưng ADR nên coi chúng là c
 ## 20. Cô lập đa tenant và RLS của cơ sở dữ liệu [Cơ sở / RLS tùy chọn]
 
 Coi cô lập tenant là một bất biến bắt buộc:
+
 - Phân giải tenant đang hoạt động từ tư cách thành viên đã được kiểm tra (mục 10.3).
 - Kiểm tra quyền sở hữu tenant của tài nguyên thông qua các tra cứu có điều kiện theo tenant (mục 12.2).
 - Đưa ID tenant vào truy vấn, ràng buộc duy nhất, index và khóa cache.
@@ -1822,9 +1898,9 @@ Theo từng lớp sự kiện:
 
 | Lớp | Sự kiện | Bắt buộc | Được tạo, và ranh giới giao dịch | Thao tác thất bại hoặc rollback nếu không ghi bền vững được sự kiện | Nếu relay hoặc sink không khả dụng | Có được phép mất? (điều kiện chính xác) | Thử lại, idempotency, trùng lặp, phục hồi |
 |---|---|---|---|---|---|---|---|
-| A | Thay đổi quản trị quan trọng về bảo mật: vai trò, phân công, tư cách thành viên, chính sách, danh mục, mở/đóng phiên hỗ trợ, chuyển tài nguyên | Có | Bên trong giao dịch của thay đổi, trước khi commit. Với thay đổi tư cách thành viên và phân công, **trigger cơ sở dữ liệu** ghi nó (22.6); với các thay đổi lớp A khác, dịch vụ tin cậy ghi nó trong cùng giao dịch | Có: toàn bộ giao dịch bị rollback; phản hồi 500 | Thay đổi vẫn được commit; relay thử lại | **Không**, đối với thay đổi đã commit qua một đường được hỗ trợ. Thiếu sự kiện chỉ có thể xảy ra qua các trường hợp bị loại trừ ở trên | `event_id` là khóa chính của outbox (sự kiện từ trigger nhận `gen_random_uuid()` lúc tạo); relay at-least-once; sink có ràng buộc duy nhất trên `event_id`; dòng `PENDING` không bao giờ bị dọn; cảnh báo ở 5 phút / 30 phút (A11) |
-| C, thay đổi dữ liệu | Thao tác thay đổi trạng thái dùng quyền rủi ro `HIGH`, hành động hỗ trợ hoặc mạo danh | Có | Như lớp A | Như lớp A | Như lớp A | Như lớp A | Như lớp A |
-| C, đọc hoặc xuất | Đọc và xuất nhạy cảm, đọc có yêu cầu xác thực tăng cường | Có (Giả định A5) | Giao dịch ngắn riêng trên outbox của cơ sở dữ liệu phục vụ việc đọc, được commit **trước khi** dữ liệu được trả ra | Có: không trả ra dữ liệu; phản hồi 500 | Thao tác tiếp tục (sự kiện đã bền vững) | **Không** đối với dữ liệu đã trả ra; sự kiện có thể ghi thừa nếu việc trả ra sau đó thất bại | Như lớp A |
+| A | Thay đổi quản trị quan trọng về bảo mật: vai trò, phân công, tư cách thành viên, chính sách, danh mục, mở/đóng phiên hỗ trợ, kích hoạt break-glass, bắt đầu và kết thúc mạo danh, chuyển tài nguyên | Có | Bên trong giao dịch của thay đổi, trước khi commit. Với thay đổi tư cách thành viên và phân công, **trigger cơ sở dữ liệu** ghi nó (22.6); với các thay đổi lớp A khác, dịch vụ tin cậy ghi nó trong cùng giao dịch | Có: toàn bộ giao dịch bị rollback; phản hồi 500 | Thay đổi vẫn được commit; relay thử lại | **Không**, đối với thay đổi đã commit qua một đường được hỗ trợ. Thiếu sự kiện chỉ có thể xảy ra qua các trường hợp bị loại trừ ở trên | `event_id` là khóa chính của outbox (sự kiện từ trigger nhận `gen_random_uuid()` lúc tạo); relay at-least-once; sink có ràng buộc duy nhất trên `event_id`; dòng `PENDING` không bao giờ bị dọn; cảnh báo ở 5 phút / 30 phút (A11) |
+| C, thay đổi dữ liệu | Thao tác thay đổi trạng thái dùng quyền rủi ro `HIGH`, hành động thay đổi trạng thái trong phiên hỗ trợ, mạo danh hoặc break-glass | Có | Như lớp A | Như lớp A | Như lớp A | Như lớp A | Như lớp A |
+| C, đọc hoặc xuất | Đọc và xuất nhạy cảm, đọc có yêu cầu xác thực tăng cường, đọc và xuất trong phiên hỗ trợ, mạo danh hoặc break-glass | Có (Giả định A5) | Giao dịch ngắn riêng trên outbox của cơ sở dữ liệu phục vụ việc đọc, được commit **trước khi** dữ liệu được trả ra | Có: không trả ra dữ liệu; phản hồi 500 | Thao tác tiếp tục (sự kiện đã bền vững) | **Không** đối với dữ liệu đã trả ra; sự kiện có thể ghi thừa nếu việc trả ra sau đó thất bại | Như lớp A |
 | B | Từ chối, lỗi đánh giá, lỗi obligation | Có | Sau khi có quyết định. Không có thay đổi nghiệp vụ nào cần lưu: hành động đã bị từ chối. Được ghi vào một hàng đợi cục bộ bền vững | **Không**: sự từ chối vẫn giữ nguyên | Sự kiện nằm trong hàng đợi cục bộ và được chuyển tiếp khi sink trở lại | **Có, chỉ** khi chính hàng đợi cục bộ không nhận được thao tác ghi (đầy, lỗi lưu trữ): được đếm trong `audit_events_lost_total`, cảnh báo (dòng 8c) | `event_id` được sinh tại nguồn; sink khử trùng lặp |
 | D | Đọc thành công thông thường và ghi rủi ro thấp | Không (có thể cấu hình; được phép lấy mẫu) | Lúc phản hồi; không gắn với giao dịch nào | Không | Bị loại bỏ hoặc đệm; được đếm | **Có, theo thiết kế**: lấy mẫu, và loại bỏ khi sink ngừng hoạt động hoặc bộ đệm đầy; được đếm | Chấp nhận trùng lặp |
 | E | Chẩn đoán vận hành | Không phải kiểm toán | Đường ống telemetry | Không bao giờ chặn | Không bao giờ chặn | Có | Không áp dụng |
@@ -1852,7 +1928,7 @@ Phân biệt ba luồng: sự kiện thay đổi phân quyền, sự kiện quy�
 ### 22.3 Tính toàn vẹn và quyền riêng tư
 
 - Hạn chế ai có thể đọc, sửa và xóa dữ liệu kiểm toán.
-- Không bao giờ ghi log access token, refresh token, mật khẩu hay bí mật; tránh dữ liệu cá nhân hoặc nhạy cảm thừa (bao gồm các trường bị `ALLOWED_FIELDS` loại bỏ).
+- Không bao giờ ghi log access token, refresh token, mật khẩu hay bí mật; tránh dữ liệu cá nhân hoặc nhạy cảm thừa; các trường bị `ALLOWED_FIELDS` loại bỏ không được xuất hiện trong payload kiểm toán (14.3).
 - Với hệ thống đòi hỏi mức bảo đảm cao, cân nhắc lưu trữ chỉ-ghi-thêm (append-only), các biện pháp kiểm soát phát hiện giả mạo, hoặc một hệ thống log độc lập.
 - Xác định chính sách lưu giữ và truy cập.
 
@@ -1878,12 +1954,12 @@ Dữ liệu phân quyền (vai trò, phân công, tư cách thành viên), dữ 
 | Dịch vụ tin cậy (với `SET LOCAL`) | Có, có xác định danh tính; các thiết lập không rò rỉ sang giao dịch tiếp theo | T-U10 |
 | SQL trực tiếp bởi bất kỳ role nào có quyền ghi các bảng | Có, được gắn cờ không xác định danh tính | T-U09 |
 | Role ứng dụng không có đặc quyền trên `audit_outbox`, không phải chủ sở hữu, không phải superuser | Có (các hàm trigger là `SECURITY DEFINER`). Role này không thể chèn, cập nhật hay xóa dòng outbox, không thể gọi `audit_emit`, không thể vô hiệu hóa trigger, và không thể chuyển sang chế độ replica | T-U11 |
-| Chủ sở hữu bảng hoặc superuser vô hiệu hóa một trigger, hoặc superuser dùng `session_replication_role = replica` | **Không.** DDL không thể ngăn chặn. Ở chế độ replica, các phân công cũng không bị thu hồi; phân công `ACTIVE` đã cũ vẫn không có hiệu lực vì kiểm tra tư cách thành viên từ chối nó | T-U12, T-U12b |
+| Chủ sở hữu bảng hoặc superuser vô hiệu hóa một trigger, hoặc superuser dùng `session_replication_role = replica` | **Không.** DDL không thể ngăn chặn. Ở chế độ replica, các phân công cũng không bị thu hồi; phân công `ACTIVE` đã cũ vẫn không có hiệu lực vì kiểm tra tư cách thành viên từ chối nó, và việc khôi phục tư cách thành viên đó bị từ chối chừng nào còn bất kỳ phân công `ACTIVE` nào (8.3) | T-U12, T-U12b |
 | `TRUNCATE` và thay đổi schema | Không được trigger mức dòng ghi nhận. Thu hồi `TRUNCATE` khỏi các role ứng dụng; thay đổi schema được quản lý bởi quy trình kiểm soát thay đổi | Chưa kiểm thử |
 
 **Các biện pháp kiểm soát bắt buộc.** Role ứng dụng không phải là chủ sở hữu bảng và không phải superuser; chỉ một nhóm nhỏ quản trị viên được kiểm toán mới có thể vô hiệu hóa trigger; `audit_outbox` chỉ ghi được thông qua `audit_emit`; role di trú tách biệt với role lúc chạy. Đây là các biện pháp kiểm soát triển khai; DDL chỉ minh họa trường hợp role bị hạn chế.
 
-**Đối soát (được đề xuất, chưa được triển khai thành tác vụ).** Mục đích: phát hiện các trường hợp mà cơ sở dữ liệu không thể ngăn chặn, tức là vượt rào bằng đặc quyền. Phạm vi phát hiện: (1) các tư cách thành viên là `REMOVED` nhưng không có sự kiện `REMOVED`; (2) các phân công `ACTIVE` có tư cách thành viên là `REMOVED`. Hai truy vấn tham chiếu đã được thực thi trong sandbox và đã đánh dấu chính xác các trường hợp vượt rào được gieo sẵn (T-U12, T-U12b). Phục hồi: không sửa tự động; phát cảnh báo; con người thu hồi các phân công cũ như ở 8.6 và ghi một sự kiện kiểm toán bù trừ được đánh dấu là đã đối soát. Yêu cầu kiểm chứng: chạy các truy vấn trên các trường hợp vượt rào được gieo sẵn trong môi trường sản phẩm. Tác vụ định kỳ, chu kỳ chạy, định tuyến cảnh báo, và khả năng truy cập sự kiện sau cửa sổ lưu giữ của outbox (khi đó nó phải đọc từ sink) **chưa được triển khai** và không phải bằng chứng rằng khoảng trống đã được khắc phục.
+**Đối soát (được đề xuất, chưa được triển khai thành tác vụ).** Mục đích: phát hiện các trường hợp mà cơ sở dữ liệu không thể ngăn chặn, tức là vượt rào bằng đặc quyền. Phạm vi phát hiện: (1) các tư cách thành viên là `REMOVED` nhưng không có sự kiện `REMOVED`; (2) các phân công `ACTIVE` có tư cách thành viên là `REMOVED`; (3) các dòng phân công không có sự kiện `created`, hoặc có giá trị hiện tại khác với sự kiện được ghi gần nhất (một vượt rào đã chèn hoặc sửa phân công); (4) các tư cách thành viên có trạng thái khác với sự kiện được ghi gần nhất. Các kiểm tra (3) và (4) chỉ được đề xuất và chưa có truy vấn tham chiếu; thay đổi trên `role_permissions` và danh mục chỉ được bao phủ bởi các sự kiện lớp A của dịch vụ tin cậy và nằm ngoài phạm vi của tác vụ này. Hai truy vấn tham chiếu đã được thực thi trong sandbox và đã đánh dấu chính xác các trường hợp vượt rào được gieo sẵn (T-U12, T-U12b). Phục hồi: không sửa tự động; phát cảnh báo; con người thu hồi các phân công cũ như ở 8.6 và ghi một sự kiện kiểm toán bù trừ được đánh dấu là đã đối soát. Yêu cầu kiểm chứng: chạy các truy vấn trên các trường hợp vượt rào được gieo sẵn trong môi trường sản phẩm. Tác vụ định kỳ, chu kỳ chạy, định tuyến cảnh báo, và khả năng truy cập sự kiện sau cửa sổ lưu giữ của outbox (khi đó nó phải đọc từ sink) **chưa được triển khai** và không phải bằng chứng rằng khoảng trống đã được khắc phục.
 
 **Giới hạn.** Không bảo đảm có sự kiện cho các thay đổi bên ngoài ba bảng này, và cho các thay đổi được thực hiện qua vượt rào đặc quyền. Bản thân kho lưu trữ outbox có thể bị mất hoặc bị thay đổi bởi một người dùng có đặc quyền (22.3).
 
@@ -1910,6 +1986,7 @@ Các giá trị mặc định dưới đây là **giả định** cần xác nh�
 | Phân công vai trò | `tenant_role_assignments`, `platform_role_assignments` | Vô hiệu hóa theo sự kiện theo tenant và principal; TTL làm chốt chặn | 60 giây | Mục hết hạn; đọc nguồn; nếu nguồn ngừng hoạt động thì từ chối (dòng 3) | Chỉ trong 60 giây | T-V01 |
 | Ánh xạ vai trò-quyền | `role_permissions` | Theo sự kiện khi có thay đổi quản trị; TTL | 300 giây (vô hiệu hóa ngay khi có sự kiện) | Như trên | Chỉ trong giới hạn | T-V03 |
 | Tư cách thành viên tenant | `tenant_memberships` | Theo sự kiện ở mọi thay đổi trạng thái (tạm ngưng, khôi phục, loại bỏ); TTL | 60 giây | Từ chối với các thao tác phụ thuộc | Chỉ trong 60 giây | T-V02 |
+| Trạng thái principal và trạng thái tenant | `principals.status`, `tenants.status` | Theo sự kiện ở mọi thay đổi trạng thái (vô hiệu hóa, tạm ngưng, khôi phục); thay đổi này cũng tăng epoch phân quyền của 23.2; TTL | 60 giây | Từ chối với các thao tác phụ thuộc | Chỉ trong 60 giây | T-V02 |
 | Quan hệ tài nguyên | `resource_relationships` hoặc bảng miền nghiệp vụ | Theo sự kiện; TTL | 60 giây (thời gian thực với tài nguyên nhạy cảm về chia sẻ) | Từ chối với các thao tác phụ thuộc | Chỉ trong giới hạn | T-V02 |
 | Cấp quyền trực tiếp / từ chối tường minh (nếu dùng) | Các bảng của chúng | Theo sự kiện, ưu tiên cho từ chối | 60 giây | Như phân công | Chỉ trong giới hạn | T-V01 |
 | Ủy quyền / phiên hỗ trợ | `delegation_records`, `support_sessions` | Theo sự kiện; bị giới hạn bởi thời hạn token và phiên | 60 giây | Từ chối | Không bao giờ vượt quá thời hạn phiên | T-V01 |
@@ -1921,7 +1998,7 @@ Các giá trị mặc định dưới đây là **giả định** cần xác nh�
 
 ### 23.2 Khóa cache
 
-Một khóa phải bao gồm mọi chiều ảnh hưởng tới kết quả: `contextKind`, `tenantId`, `principalId` (và `actorId`/`representedPrincipalId` nếu có), `action`, id tài nguyên hoặc thuộc tính phạm vi, epoch phân quyền của principal-và-tenant (một bộ đếm được tăng khi có bất kỳ thay đổi nào ảnh hưởng đến chúng), `policyVersion`, và mọi mức bảo đảm mà quyết định phụ thuộc vào. Không bao giờ dùng khóa chỉ gồm `user_id + action`. Không bao giờ cache `INDETERMINATE` hoặc một lỗi như một cho phép, và tránh cache các quyết định phụ thuộc vào thuộc tính thay đổi nhanh mà không có cơ chế vô hiệu hóa.
+Một khóa phải bao gồm mọi chiều ảnh hưởng tới kết quả: `contextKind`, `tenantId`, `principalId` (và `actorId`/`representedPrincipalId` nếu có), `action`, id tài nguyên hoặc thuộc tính phạm vi, epoch phân quyền của principal-và-tenant (một bộ đếm được tăng khi có bất kỳ thay đổi nào ảnh hưởng đến chúng), `policyVersion`, và mọi mức bảo đảm mà quyết định phụ thuộc vào. Không bao giờ dùng khóa chỉ gồm `user_id + action`. Không bao giờ cache một kết quả `INDETERMINATE` hoặc một lỗi, dù như một cho phép hay một từ chối (mục 15, dòng 10), và tránh cache các quyết định phụ thuộc vào thuộc tính thay đổi nhanh mà không có cơ chế vô hiệu hóa.
 
 ### 23.3 Ân hạn cho quyết định đã cache khi phụ thuộc gặp sự cố [Tùy chọn, mặc định tắt]
 
@@ -1944,7 +2021,7 @@ Một khóa phải bao gồm mọi chiều ảnh hưởng tới kết quả: `co
 - Phiên hỗ trợ và mạo danh: thẩm quyền của chúng theo thiết kế bị giới hạn thời gian.
 - Thao tác có yêu cầu xác thực tăng cường và yêu cầu liên quan đến ủy quyền: mức bảo đảm của chúng không thể tái dựng từ một quyết định đã cache.
 
-**Yêu cầu đối với mục cache.** Mục được tạo khi các phụ thuộc đang hoạt động tốt và nằm trong giới hạn độ cũ bình thường lúc tạo; nó mang `policyVersion` và epoch phân quyền của nó; tuổi tuyệt đối kể từ khi tạo tối đa bằng giới hạn ân hạn (300 giây). Mọi sự kiện vô hiệu hóa nhận được (loại bỏ tư cách thành viên, thu hồi phân công, thay đổi vai trò-quyền, thay đổi phiên bản chính sách) đều xóa mục đó, nên ân hạn không bao giờ phục vụ quyết định cho một principal hay tenant có thu hồi đã biết. Do đó ngữ nghĩa thu hồi là: bình thường có hiệu lực trong SLA; trong thời gian ân hạn, bị giới hạn bởi giới hạn ân hạn.
+**Yêu cầu đối với mục cache.** Mục được tạo từ dữ liệu phân quyền đọc được khi các phụ thuộc đang hoạt động tốt; nó mang `policyVersion` và epoch phân quyền của nó; tuổi của nó, tính từ thời điểm dữ liệu đó được đọc (không phải từ thời điểm mục được lưu), tối đa bằng giới hạn ân hạn (300 giây). Tính theo cách này, độ trễ thu hồi trong trường hợp xấu nhất trong thời gian ân hạn là 300 giây, đúng như đã công bố. Mọi sự kiện vô hiệu hóa nhận được (loại bỏ tư cách thành viên, thu hồi phân công, thay đổi vai trò-quyền, thay đổi phiên bản chính sách) đều xóa mục đó, nên ân hạn không bao giờ phục vụ quyết định cho một principal hay tenant có thu hồi đã biết. Do đó ngữ nghĩa thu hồi là: bình thường có hiệu lực trong SLA; trong thời gian ân hạn, bị giới hạn bởi giới hạn ân hạn.
 
 **Rủi ro tồn dư.** Nếu kênh vô hiệu hóa cũng ngừng hoạt động cùng lúc, các thu hồi sẽ không được nhận biết và trường hợp xấu nhất là giới hạn ân hạn.
 
@@ -2031,12 +2108,13 @@ Các dòng được đánh dấu `RI/PS` đã chạy trong sandbox với **tạo
 | T-A07 | Id chủ sở hữu do client cung cấp | Bị bỏ qua; chủ sở hữu được đọc từ kho tài nguyên | P0-3 | S/NR |
 | T-A08 | Kiểm tra tĩnh: các trường `ClientHints` đi tới đầu vào của PDP | Build thất bại | P0-3 | S/NR |
 | T-A09 | Cùng yêu cầu với một id tenant không tồn tại | Giống từng byte với T-A01 ngoại trừ `correlationId`: cùng trạng thái, header và thân phản hồi | P2-1† | S/NR |
-| T-A10 | Tư cách thành viên của maya là `REMOVED`, rồi (riêng biệt) `SUSPENDED`; và cả một lần loại bỏ xảy ra trong khi đang có phiên | Cùng `403 tenant_access_denied` ở yêu cầu tiếp theo; một kết nối dài hạn gắn với tenant kiểm tra lại tư cách thành viên hoặc bị đóng | P2-1† | S/NR |
+| T-A10 | Tư cách thành viên của maya là `REMOVED`, rồi (riêng biệt) `SUSPENDED`; và cả trường hợp bị loại bỏ trong khi phiên đang diễn ra | Cùng `403 tenant_access_denied` ở yêu cầu tiếp theo; một kết nối dài hạn gắn với tenant kiểm tra lại tư cách thành viên hoặc bị đóng | P2-1† | S/NR |
 | T-A11 | Tenant bị tạm ngưng | Cùng `403 tenant_access_denied`; `TENANT_SUSPENDED` chỉ xuất hiện trong sự kiện kiểm toán nội bộ | P2-1† | S/NR |
 | T-A12 | So sánh cấu trúc và header giữa bốn trường hợp con của tenant; lặp lại nỗ lực nhiều lần | Không có id tenant trong bất kỳ thân phản hồi hay header nào; không có khác biệt về header; các nỗ lực lặp lại bị giới hạn tần suất theo chính sách rate-limit | P2-1† | S/NR |
 | T-A13 | Gợi ý tenant sai định dạng (không phải định dạng id hợp lệ) | `400 invalid_request`; không tra cứu tư cách thành viên | P2-1† | S/NR |
 
 ### 24.4 Hành vi khi lỗi
+
 *Xác minh bằng:* kiểm thử chèn lỗi (fault-injection) dừng hoặc làm hỏng phụ thuộc và khẳng định rằng không có lời gọi hay truy vấn nào phía sau xảy ra; T-F08 và T-F14 ở mức cơ sở dữ liệu và relay.
 
 | ID | Kịch bản | Mong đợi | Phát hiện | Trạng thái |
@@ -2176,9 +2254,9 @@ Các dòng được đánh dấu `RI/PS` đã chạy trong sandbox với **tạo
 | T-V06 | Các phiên bản chính sách lẫn lộn trong khi triển khai dần | Quyết định được gắn nhãn phiên bản; không có cache hit chéo phiên bản | P1-8 | S/NR |
 | T-V07 | Quyền rủi ro `HIGH` | Đọc nguồn sự thật ở mỗi yêu cầu | P1-8 | S/NR |
 | T-V08 | Cache hit trong TTL | Được phục vụ từ cache mà không đọc nguồn; kết quả bằng kết quả của nguồn | P2-2† | S/NR |
-| T-V09 | Thu hồi một phân công, loại bỏ một tư cách thành viên, thay đổi một ánh xạ vai trò-quyền (ân hạn bị tắt) | Các sự kiện vô hiệu hóa xóa các mục; truy cập bị từ chối trong vòng 60 giây | P2-2† | S/NR |
+| T-V09 | Thu hồi một phân công, loại bỏ một tư cách thành viên, thay đổi một ánh xạ vai trò-quyền (ân hạn bị tắt) | Các sự kiện vô hiệu hóa xóa các mục; truy cập bị từ chối trong vòng 60 giây đối với phân công và tư cách thành viên, và tối đa trong vòng 300 giây đối với ánh xạ vai trò-quyền (được xóa khi có sự kiện) | P2-2† | S/NR |
 | T-V10 | Một phụ thuộc phân quyền không khả dụng, ân hạn bị tắt | `503 authorization_unavailable`; không phục vụ cho phép đã cache nào | P2-2† | S/NR |
-| T-V11 | Phụ thuộc không khả dụng, ân hạn được bật, một thao tác đọc đủ điều kiện (rủi ro `LOW`, ngữ cảnh `TENANT`) | Được phục vụ từ một mục được tạo khi hệ thống ổn định và có tuổi dưới 300 giây; cờ kiểm toán `served_from_grace`; chỉ số đo và cảnh báo | P2-2† | S/NR |
+| T-V11 | Phụ thuộc không khả dụng, ân hạn được bật, một thao tác đọc đủ điều kiện (rủi ro `LOW`, ngữ cảnh `TENANT`) | Chỉ được phục vụ sau khi circuit breaker của phụ thuộc đã mở được 10 giây (A12), từ một mục được tạo khi hệ thống ổn định và có tuổi dưới 300 giây; cờ kiểm toán `served_from_grace`; chỉ số đo và cảnh báo | P2-2† | S/NR |
 | T-V12 | Ân hạn được bật; một thao tác ghi, một bản xuất, một quyền rủi ro `HIGH`, ngữ cảnh `PLATFORM`, một yêu cầu được ủy quyền, một phiên hỗ trợ | Không bao giờ được phục vụ từ ân hạn; `503` | P2-2† | S/NR |
 | T-V13 | Nhận được một sự kiện thu hồi trong thời gian ân hạn | Mục bị xóa; yêu cầu bị từ chối hoặc `503`; không bao giờ được phục vụ | P2-2† | S/NR |
 | T-V14 | Đo độ trễ thu hồi trong vận hành bình thường và trong một sự cố đã công bố với ân hạn được bật | Tối đa 60 giây bình thường và tối đa 300 giây khi có sự cố; cả hai khớp với tuyên bố SLA đã công bố | P2-2† | S/NR |
@@ -2199,7 +2277,7 @@ Các dòng được đánh dấu `RI/PS` đã chạy trong sandbox với **tạo
 
 ### 24.13 Chuyển tài nguyên và kiểm toán
 
-*Xác minh bằng:* kiểm thử cơ sở dữ liệu và relay cho T-U01, T-U02, T-U06; kiểm thử ở mức API cho chuyển tài nguyên và lớp C.
+*Xác minh bằng:* kiểm thử cơ sở dữ liệu và relay cho T-U01, T-U02, T-U06, T-U09 đến T-U15 (bản triển khai tham chiếu, sandbox); T-U18 (cơ sở dữ liệu, được thêm sau lần chạy sandbox, chưa được thực thi); kiểm thử ở mức API cho chuyển tài nguyên và lớp C.
 
 | ID | Kịch bản | Mong đợi | Phát hiện | Trạng thái |
 |---|---|---|---|---|
@@ -2225,6 +2303,7 @@ Các dòng được đánh dấu `RI/PS` đã chạy trong sandbox với **tạo
 | T-U14 | Relay hoặc sink ngừng hoạt động sau khi các sự kiện do trigger ghi đã được lưu bền vững | Việc loại bỏ vẫn được commit; sự kiện vẫn `PENDING`; số lần thử được đếm | P1-2‡ | RI/PS |
 | T-U15 | Phục hồi cộng phân phối trùng lặp các sự kiện do trigger ghi | Mỗi sự kiện có trong sink đúng một lần; không sự kiện nào ở `PENDING` | P1-2‡ | RI/PS |
 | T-U16 | Ngữ nghĩa mất mát: hàng đợi cục bộ lớp B không nhận được sự kiện; sự kiện lớp D bị loại bỏ | Lớp B: bị mất, được đếm, cảnh báo, sự từ chối giữ nguyên. Lớp D: bị loại bỏ theo thiết kế, được đếm | P1-2‡ | S/NR |
+| T-U18 | UPDATE `valid_until`, phạm vi, vai trò, principal hoặc `approval_reference` của một phân công (SQL trực tiếp và qua dịch vụ) | Một sự kiện lớp A `*.modified` kèm giá trị cũ và mới trong cùng giao dịch | - | S/NR |
 | T-U17 | Tác vụ đối soát định kỳ trong sản phẩm (chu kỳ, định tuyến cảnh báo, truy cập sink sau thời gian lưu giữ outbox) | Các trường hợp vượt rào được gieo sẵn được phát hiện và cảnh báo | P1-2‡ | S/NR |
 
 ### 24.14 Kế thừa từ v1.2 (đã cập nhật)
@@ -2246,7 +2325,7 @@ Các dòng được đánh dấu `RI/PS` đã chạy trong sandbox với **tạo
 
 ### 24.15 Quyền sở hữu vai trò, vòng đời tư cách thành viên, cách đặt tên danh mục và di trú
 
-*Xác minh bằng:* kiểm thử tích hợp cơ sở dữ liệu (T-RO, T-M, T-N01, T-MIG) và unit test hoặc lint (T-RO08, T-N02 đến T-N06).
+*Xác minh bằng:* kiểm thử tích hợp cơ sở dữ liệu (T-RO01 đến T-RO07, T-RO09 đến T-RO11, T-M01 đến T-M03, T-M05, T-M06, T-M08 đến T-M17, T-N01, T-MIG; T-RO12 bằng kiểm tra tài liệu); kiểm thử PDP và sản phẩm (T-M04, T-M07, T-M18, T-M19 đến T-M21); kiểm thử cơ sở dữ liệu được thêm sau lần chạy sandbox và chưa được thực thi (T-M22 đến T-M24); unit test hoặc lint (T-RO08, T-N02 đến T-N06).
 
 | ID | Kịch bản | Mong đợi | Phát hiện | Trạng thái |
 |---|---|---|---|---|
@@ -2272,14 +2351,20 @@ Các dòng được đánh dấu `RI/PS` đã chạy trong sandbox với **tạo
 | T-M08 | Tư cách thành viên `ACTIVE` với một phân công đã lưu hợp lệ, được đánh giá qua bốn đường tham chiếu (đơn lẻ, danh sách, hàng loạt, tác vụ) | Cả bốn đường đều cho phép đúng tài liệu nằm trong phạm vi | P1-1‡ | RI/PS |
 | T-M09 | `ACTIVE` -> `SUSPENDED` trong khi phân công đã lưu vẫn `ACTIVE`; một tác vụ được đưa vào hàng đợi trước khi tạm ngưng chạy sau đó | Dòng đã lưu vẫn `ACTIVE`, nhưng đơn lẻ, danh sách, hàng loạt và tác vụ chạy muộn đều từ chối | P1-1‡ | RI/PS |
 | T-M10 | `SUSPENDED` -> `ACTIVE` với: một phân công vẫn hợp lệ; một phân công đã hết hạn trong thời gian đó; một phân công đã bị thu hồi trong thời gian đó | Chỉ phân công vẫn hợp lệ mới có hiệu lực trở lại; phân công hết hạn và bị thu hồi vẫn không có hiệu lực | P1-1‡ | RI/PS |
-| T-M11 | `ACTIVE` -> `REMOVED`, rồi khôi phục, rồi một cấp quyền mới | Các phân công `REVOKED` (`MEMBERSHIP_ENDED`); mọi đường đều từ chối, kể cả sau khi khôi phục; chỉ cấp quyền mới có hiệu lực | P1-1‡ | RI/PS |
-| T-M12 | Kiểm tra tĩnh thiết kế tham chiếu | Không đường phân quyền nào đọc trực tiếp phân công hay tư cách thành viên; tất cả đều dùng một điểm nghẽn duy nhất | P1-1‡ | RI/PS |
+| T-M11 | `ACTIVE` -> `REMOVED`, rồi khôi phục, rồi một grant mới | Các phân công `REVOKED` (`MEMBERSHIP_ENDED`); mọi đường đều từ chối, kể cả sau khi khôi phục; chỉ grant mới có hiệu lực | P1-1‡ | RI/PS |
+| T-M12 | Kiểm tra tĩnh thiết kế tham chiếu | Không đường phân quyền nào đọc trực tiếp phân công hay tư cách thành viên; tất cả đều dùng một điểm chặn tập trung | P1-1‡ | RI/PS |
 | T-M13 | Loại bỏ theo kiểu dịch vụ (chỉ trạng thái, với actor đặt bằng `SET LOCAL`) | Cơ sở dữ liệu đặt `ended_at`; phân công bị thu hồi trong cùng giao dịch; `revoked_at` bằng `ended_at` | P2-2‡ | RI/PS |
 | T-M14 | SQL trực tiếp: chuyển vào `REMOVED` mà không có `ended_at`; đặt null `ended_at` trên dòng đã loại bỏ; đặt `ended_at` trên dòng chưa loại bỏ; cung cấp một giá trị tường minh | Không bao giờ có dòng đã loại bỏ với `ended_at` null; trường hợp thứ hai và thứ ba bị từ chối; giá trị được cung cấp được giữ nguyên | P2-2‡ | RI/PS |
 | T-M15 | Loại bỏ lặp lại (thử lại idempotent) | `ended_at` và `revoked_at` không đổi; không có thu hồi mới và không có sự kiện kiểm toán mới | P2-2‡ | RI/PS |
 | T-M16 | Cập nhật không liên quan trên một tư cách thành viên đã bị loại bỏ | `ended_at` không đổi | P2-2‡ | RI/PS |
 | T-M17 | Khôi phục, rồi loại bỏ lần nữa | Khôi phục xóa `ended_at`; lần loại bỏ sau đặt một `ended_at` muộn hơn | P2-2‡ | RI/PS |
 | T-M18 | Sản phẩm: mọi đường phân quyền thực tế (API đơn lẻ, danh sách, hàng loạt, tác vụ nền, xuất dữ liệu) cho thành viên `SUSPENDED` và `REMOVED` | Mọi đường đều từ chối; một tác vụ được đưa vào hàng đợi trước đó bị từ chối khi chạy | P1-1‡ | S/NR |
+| T-M19 | Người thực hiện có `role.manage` thêm vào một vai trò tùy chỉnh một quyền mà người đó không nắm giữ | Bị từ chối (7.8) | - | S/NR |
+| T-M20 | Người cấp phân công một vai trò chứa một quyền mà họ không nắm giữ, hoặc ở một phạm vi mà các grant của chính họ không bao phủ | Bị từ chối (7.8) | - | S/NR |
+| T-M21 | Một principal phân công một vai trò cho chính mình, có và không có người phê duyệt thứ hai trong `approval_reference` | Bị từ chối nếu không có; được chấp nhận nếu có người phê duyệt khác được ghi lại (7.8) | - | S/NR |
+| T-M22 | UPDATE một phân công `ACTIVE` sao cho `principal_id` hoặc `tenant_id` trỏ tới một tư cách thành viên `SUSPENDED` hoặc `REMOVED`, hoặc tới một principal không có tư cách thành viên | Bị trigger của phân công từ chối (R1, R4) | - | S/NR |
+| T-M23 | Đặt một dòng `REVOKED` của `platform_role_assignments` trở lại `ACTIVE`; thay đổi `principal_id` hoặc `role_id` của nó | Mỗi trường hợp đều bị `platform_assignment_integrity` từ chối | - | S/NR |
+| T-M24 | Khôi phục một tư cách thành viên `REMOVED` trong khi vẫn còn một phân công `ACTIVE` (do một vượt rào tạo ra), rồi thu hồi nó và thử lại | Bị từ chối lần đầu; được chấp nhận sau khi thu hồi, và phân công cũ vẫn `REVOKED` | - | S/NR |
 | T-N01 | Khóa `platform.` với ngữ cảnh `TENANT`; khóa không có tiền tố với ngữ cảnh `PLATFORM` | Cả hai bị `permissions_context_prefix_ck` từ chối | P2-3† | RI/PS |
 | T-N02 | Lint danh mục trên mọi khóa | Thất bại khi sai cú pháp, sai quy tắc tiền tố, hoặc thiếu loại ngữ cảnh | P2-3† | S/NR |
 | T-N03 | `check` với một hành động không có trong danh mục | `INDETERMINATE / UNKNOWN_PERMISSION`; `500 internal_error`; cảnh báo | P2-3† | S/NR |
@@ -2430,10 +2515,10 @@ Miền nghiệp vụ: một dịch vụ tài liệu trung tính. Tài nguyên `d
 
 ```json
 {
-  "event_id": "e-0193", "class": "B", "correlationId": "c-7f22",
-  "tenantId": "X", "actorId": "maya", "action": "document.update",
+  "event_id": "e-0193", "event_class": "B", "correlation_id": "c-7f22",
+  "tenant_id": "X", "actor_id": "maya", "action": "document.update",
   "resource": { "type": "document", "id": "doc-9" },
-  "state": "DENY", "reasonCode": "OUT_OF_SCOPE", "policyVersion": "2026.10.1"
+  "state": "DENY", "reason_code": "OUT_OF_SCOPE", "policy_version": "2026.10.1"
 }
 ```
 
@@ -2473,9 +2558,9 @@ Nếu thay vào đó Maya có thể đọc `doc-9` nhưng thiếu `document.upda
 
 | Principal | Phân công | Hành động được phép | Phạm vi dữ liệu cho `document.read` |
 |---|---|---|---|
-| Maya | `editor` @ `TEAM team-17`, `TEAM team-22` | đọc, tạo, cập nhật | `tenant = X AND team_id IN (team-17, team-22)` |
-| Omar | `viewer` @ `TENANT` | đọc | `tenant = X` |
-| Priya | `editor` @ `COMPANY company-a` | đọc, tạo, cập nhật | `tenant = X AND company_id = company-a` |
+| Maya | `editor` @ `TEAM team-17`, `TEAM team-22` | đọc, tạo, cập nhật | `tenant_id = X AND team_id IN (team-17, team-22)` |
+| Omar | `viewer` @ `TENANT` | đọc | `tenant_id = X` |
+| Priya | `editor` @ `COMPANY company-a` | đọc, tạo, cập nhật | `tenant_id = X AND company_id = company-a` |
 
 Quyền cho biết hành động nào được phép; phạm vi dữ liệu cho biết những bản ghi nào. Nắm giữ `document.update` không hàm ý được truy cập mọi tài liệu.
 
@@ -2563,7 +2648,7 @@ Ghi lại quyết định cho:
 
 ## 30. Bảng trạng thái quyết định
 
-Trạng thái: **đã quyết định** (tài liệu này ấn định), **khuyến nghị** (mặc định; cần xác nhận), **tùy chọn**, **chưa giải quyết** (cần đầu vào từ nghiệp vụ).
+Trạng thái: **đã quyết định** (tài liệu này ấn định), **khuyến nghị** (mặc định; cần xác nhận), **tùy chọn**, **chưa giải quyết** (cần đầu vào từ nghiệp vụ). Một trạng thái có thể kèm một bổ ngữ sau dấu phẩy hoặc dấu chấm phẩy, như "chờ con người xác nhận", hoặc một tham chiếu tới id của giả định hay quyết định.
 
 | Chủ đề | Trạng thái | Lựa chọn | Lý do | Đánh đổi | Mục | Câu hỏi mở | Điều kiện để thay đổi |
 |---|---|---|---|---|---|---|---|
@@ -2581,7 +2666,7 @@ Trạng thái: **đã quyết định** (tài liệu này ấn định), **khuy�
 | Cấp quyền trực tiếp | tùy chọn | Phương án A (chỉ vai trò) | Dễ quản trị hơn | Kém linh hoạt hơn | 7.6 | - | Nhu cầu cụ thể |
 | RLS | tùy chọn | Phòng thủ chiều sâu | Thêm lớp ngăn chặn | Phức tạp về vận hành | 20 | - | Nhu cầu cô lập theo quy định |
 | Quyền sở hữu vai trò (D2) | đã quyết định | `is_system_defined` tường minh; các trường quyền sở hữu bất biến; check và trigger ở DB | Không suy ra quyền sở hữu từ `tenant_id IS NULL` | Nâng cấp một vai trò cần tạo vai trò mới | 8.2.1 | - | Nhu cầu sản phẩm muốn chuyển chủ sở hữu vai trò |
-| Vòng đời tư cách thành viên (D3) | đã quyết định (được làm rõ trong v1.4.1) | Trạng thái phân công lưu trữ tách biệt với phân quyền hiệu lực. Tạm ngưng giữ lại phân công đã lưu nhưng chúng không trao gì; khôi phục làm các phân công còn hợp lệ có hiệu lực trở lại; loại bỏ thu hồi trong cùng giao dịch và không bao giờ âm thầm được khôi phục | Không âm thầm khôi phục thẩm quyền sau khi loại bỏ; tạm ngưng vẫn có thể đảo ngược | Các dòng `ACTIVE` cũ tồn tại trong thời gian tạm ngưng và phụ thuộc vào kiểm tra tư cách thành viên trên mọi đường | 8.5 | - | Yêu cầu rằng tạm ngưng cũng phải thu hồi |
+| Vòng đời tư cách thành viên (D3) | đã quyết định, chờ con người xác nhận (A14; được làm rõ trong v1.4.1) | Trạng thái phân công lưu trữ tách biệt với phân quyền hiệu lực. Tạm ngưng giữ lại phân công đã lưu nhưng chúng không trao gì; khôi phục làm các phân công còn hợp lệ có hiệu lực trở lại; loại bỏ thu hồi trong cùng giao dịch và không bao giờ âm thầm được khôi phục | Không âm thầm khôi phục thẩm quyền sau khi loại bỏ; tạm ngưng vẫn có thể đảo ngược | Các dòng `ACTIVE` cũ tồn tại trong thời gian tạm ngưng và phụ thuộc vào kiểm tra tư cách thành viên trên mọi đường | 8.5 | - | Yêu cầu rằng tạm ngưng cũng phải thu hồi |
 | Phạm vi `IN` của `FilterPlan` (D5) | đã quyết định | `IN` chỉ cho `ID`, `STRING`, `ENUM`, `NUMBER`; không có cho `BOOLEAN` hay `TIMESTAMP` | Mỗi loại một mảng có kiểu, không có toán tử vô dụng | Không biểu diễn được `IN` trên boolean hay thời điểm | 13.2 | - | Một trường hợp sử dụng cụ thể |
 | Không gian tên ngữ cảnh của quyền (D6) | đã quyết định | Tiền tố `platform.` cho mọi quyền `PLATFORM` | Ngữ cảnh hiển thị rõ trong mã, chính sách và log | Phải đổi tên từ khóa v1.3 | 6.1, 6.4 | - | Một quy ước đặt tên khác trong danh mục hiện có |
 | Phản hồi khi chọn tenant thất bại (A13) | khuyến nghị | `403 tenant_access_denied`, giống hệt cho mọi trường hợp con | Không dò liệt kê được tenant | Khác với 404 dùng cho tài nguyên | 12.3, 12.4 | Sản phẩm có ưu tiên 404 không | Quy ước API |
@@ -2593,17 +2678,18 @@ Trạng thái: **đã quyết định** (tài liệu này ấn định), **khuy�
 
 ## 31. Tài liệu tham khảo
 
-Hãy xác minh từng liên kết trước khi công bố; URL và cấu trúc trang có thể đã thay đổi.
+Hãy xác minh từng liên kết trước khi công bố; URL và cấu trúc trang có thể đã thay đổi. Khi bản sửa đổi này được kiểm tra, trang OWASP 2023, RFC 7643, trang Zanzibar và trang gốc tài liệu OPA truy cập được; các URL OPA data-filtering, NIST, OpenFGA và SpiceDB không thể tải được từ môi trường kiểm tra và vẫn chưa được xác minh.
 
 - NIST SP 800-162, *Guide to Attribute Based Access Control (ABAC) Definition and Considerations*: https://csrc.nist.gov/pubs/sp/800/162/upd2/final
 - OWASP Authorization Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html
-- OWASP API Security Top 10: https://owasp.org/API-Security/
+- OWASP API Security Top 10, ấn bản 2023: https://owasp.org/API-Security/editions/2023/en/0x11-t10/
 - Tài liệu Open Policy Agent: https://www.openpolicyagent.org/docs
 - Open Policy Agent, lọc dữ liệu (data filtering): https://www.openpolicyagent.org/docs/filtering
 - PostgreSQL Row Security Policies: https://www.postgresql.org/docs/current/ddl-rowsecurity.html
 - PostgreSQL `CREATE POLICY`: https://www.postgresql.org/docs/current/sql-createpolicy.html
 - PostgreSQL `CREATE INDEX` (bao gồm `NULLS NOT DISTINCT`): https://www.postgresql.org/docs/current/sql-createindex.html
 - Google Research, *Zanzibar: Google's Consistent, Global Authorization System*: https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/
+- RFC 7643, *System for Cross-domain Identity Management: Core Schema*: https://www.rfc-editor.org/rfc/rfc7643
 - RFC 7644, *System for Cross-domain Identity Management (SCIM) Protocol*: https://www.rfc-editor.org/rfc/rfc7644
 - Tài liệu OpenFGA: https://openfga.dev/docs
 - Tài liệu SpiceDB: https://authzed.com/docs
@@ -2613,6 +2699,19 @@ Hãy xác minh từng liên kết trước khi công bố; URL và cấu trúc t
 ---
 
 ## Phụ lục A. Nhật ký thay đổi
+
+### A.0 Các hiệu chỉnh được áp dụng sau đợt rà soát v1.4.1 (cùng số phiên bản)
+
+Một đợt rà soát sau đó của tài liệu này đã phát hiện các điểm không nhất quán và khoảng trống; chúng được sửa tại chỗ mà không đổi số phiên bản. **Các hiệu chỉnh này chưa được thực thi.** Các tệp đi kèm (`authz_v1_4_1_reference.sql`, tệp dữ liệu khởi tạo, test harness, `doc_consistency_check.py`) và các kết quả sandbox của Phụ lục D mô tả DDL và tài liệu **trước** các hiệu chỉnh này. Trước khi dựa vào bằng chứng của Phụ lục D, hãy tạo lại SQL đi kèm từ mục 8.3 và chạy lại harness cùng kiểm tra tài liệu.
+
+| Khu vực | Mục | Thay đổi gì |
+|---|---|---|
+| DDL | 8.2, 8.3, 8.5.2, 22.6 | `CHECK` `scope_id` không rỗng; kiểm tra tư cách thành viên cũng áp dụng khi một phân công `ACTIVE` bị trỏ sang principal hoặc tenant khác; trigger cấm kích hoạt lại và bất biến cho `platform_role_assignments`; sự kiện kiểm toán cho thay đổi ở bất kỳ cột phân công nào liên quan đến bảo mật; thu hồi lan truyền ghi `revoked_by`; khôi phục bị từ chối khi vẫn còn phân công `ACTIVE`; khóa dữ liệu khởi tạo `authz.deny.manage` nay có `resource_type = 'authz.deny'`; chú thích mô hình đặc quyền cho các role quản trị vai trò và quản trị platform riêng; `app.actor_id` được ghi nhận là giá trị được khẳng định |
+| Quy tắc mới | 7.8, 6.4, kiểm thử T-M19 đến T-M24, T-U18 | Quy tắc mức cơ sở rằng việc định nghĩa vai trò và phân công nằm trong thẩm quyền của chính người thực hiện; không tự cấp |
+| Thuật toán quyết định | 10.2, 11.1 đến 11.3, 12.3, 12.4, 14, 15, 17.1, 19 | Tư cách thành viên vắng mặt là một giá trị đã được định nghĩa; các kiểu dùng `AuthzPlan`; các bước Giai đoạn A đổi tên thành PA1 đến PA4; ràng buộc của thao tác tập hợp được đẩy vào plan; phiên hỗ trợ thay thế tư cách thành viên ở bước B2; các dòng HTTP mới và `rate_limited`; `REQUIRE_STEP_UP_AUTH` có thêm `minAssurance` và quy tắc gộp cho `mandatory`; hàng loạt được ghi nhận là ngoại lệ not-found; kiểm tra lại grant trong giao dịch ghi |
+| Cache và kiểm toán | 22.1, 22.3, 22.6, 23.1 đến 23.3 | Dòng độ cũ cho trạng thái principal và tenant; tuổi ân hạn tính từ thời điểm đọc dữ liệu; `INDETERMINATE` không bao giờ được cache; các lớp sự kiện break-glass và mạo danh; phạm vi đối soát rộng hơn |
+| Văn bản bằng chứng | 24.13, 24.15, 30, Phụ lục D | D.2 được đối chiếu (140 ID = 134 kiểm thử của harness + 6 ID của kiểm tra tài liệu); danh sách kiểm thử đã thực thi không còn gồm các dòng chỉ mới đặc tả (T-P08, T-P16, T-P17, T-RO08, T-M04, T-M07); số liệu D.3: các dòng `S/NR` là 148 (trước đây 141) do thêm T-M19 đến T-M24 và T-U18; bỏ cách diễn đạt ngôi thứ nhất; trạng thái D3 được căn chỉnh với Phụ lục C |
+| Khác | Phần đầu tài liệu, 24.0, 31 | Nhãn "v1.4" đổi thành "v1.4.1"; ấn bản OWASP được ghim; thêm RFC 7643; ghi chú các URL chưa xác minh |
 
 ### A.1 v1.4 sang v1.4.1
 
@@ -2651,7 +2750,7 @@ Các phát hiện đến từ đợt rà soát v1.3. Cột "Lý do" nêu lý do 
 Các thay đổi bổ sung phát hiện trong đợt rà soát hồi quy (không có trong yêu cầu rà soát):
 
 - `status` của tenant (`SUSPENDED`) chưa bao giờ được thuật toán kiểm tra. Bước B2 giờ kiểm tra nó, với lý do `TENANT_SUSPENDED`, được ánh xạ tới cùng mã 403 như khi không có tư cách thành viên.
-- Hành động không có trong danh mục chưa được xử lý. Thêm bước A4 mới và lý do `UNKNOWN_PERMISSION` (`INDETERMINATE`, 500).
+- Hành động không có trong danh mục chưa được xử lý. Thêm bước PA4 mới và lý do `UNKNOWN_PERMISSION` (`INDETERMINATE`, 500).
 - Bản nháp đầu tiên của trigger phân công chặn việc sửa các dòng đã thu hồi trong lịch sử; giờ nó chỉ kiểm tra lại vai trò khi chèn hoặc khi `role_id` hay `tenant_id` thay đổi (T-M06, mục 8.6).
 - Bổ sung tra cứu grant tham chiếu (8.7, T-G07) vì một số quy tắc phụ thuộc vào nó.
 - Bổ sung quyền ngữ cảnh tenant `tenant_membership.manage`, cần cho vòng đời tư cách thành viên.
@@ -2815,7 +2914,7 @@ Môi trường của các lần chạy sandbox: Python 3.12.3; `pgserver` 0.1.4 
 
 Một đối chứng thứ năm (xóa các trigger kiểm toán) bị dừng với lỗi khi một kiểm thử sau đó tham chiếu tới trigger đã bị xóa, nên nó không cho ra danh sách theo từng kiểm thử và không được tính là bằng chứng.
 
-Những gì lần chạy phát hiện: truy vấn di trú của v1.4 đánh dấu các phân công `ACTIVE` của tư cách thành viên `SUSPENDED`, điều mâu thuẫn với vòng đời (đã sửa ở 8.6); trigger kiểm toán cần `SECURITY DEFINER` cho role bị hạn chế (T-U11); và hai lỗi trong harness của tác giả (giới hạn lô của relay, một tên biến bị dùng lại) đã được sửa trong harness. Không phát hiện lỗi DDL nào khác.
+Những gì lần chạy phát hiện: truy vấn di trú của v1.4 đánh dấu các phân công `ACTIVE` của tư cách thành viên `SUSPENDED`, điều mâu thuẫn với vòng đời (đã sửa ở 8.6); trigger kiểm toán cần `SECURITY DEFINER` cho role bị hạn chế (T-U11); và hai lỗi trong test harness (giới hạn lô của relay, một tên biến bị dùng lại) đã được sửa trong harness. Không phát hiện lỗi DDL nào khác.
 
 ### D.2 Các kiểm thử đã thực thi theo nhóm
 
@@ -2832,9 +2931,11 @@ Những gì lần chạy phát hiện: truy vấn di trú của v1.4 đánh dấ
 | T-MIG | 5 | T-MIG01, T-MIG02a, T-MIG02b, T-MIG02c, T-MIG03 |
 | T-DOC | 5 | T-DOC01, T-DOC02, T-DOC03, T-DOC04, T-DOC05 |
 
+Bảng liệt kê 140 ID. Sáu trong số đó do `doc_consistency_check.py` tạo ra (6 kiểm tra ở D.1): T-RO12 và T-DOC01 đến T-DOC05. 134 ID còn lại là các kiểm thử do `authz_v1_4_1_reference_tests.py` chạy, đây là con số "134 đã thực thi, 134 đạt" được dùng ở những nơi khác trong tài liệu này.
+
 ### D.3 Trạng thái các dòng danh mục (mục 24)
 
-`RI/PS` (đã triển khai tham chiếu, đạt trong sandbox): **74** dòng. `S/NR` (đã đặc tả, chưa chạy): **141** dòng. `PI` hoặc `PC` (đã triển khai trong sản phẩm, đạt trong CI của sản phẩm): **0** dòng. Một dòng có thể gộp nhiều kiểm thử con đã thực thi.
+`RI/PS` (đã triển khai tham chiếu, đạt trong sandbox): **74** dòng. `S/NR` (đã đặc tả, chưa chạy): **148** dòng. `PI` hoặc `PC` (đã triển khai trong sản phẩm, đạt trong CI của sản phẩm): **0** dòng. Một dòng có thể gộp nhiều kiểm thử con đã thực thi.
 
 Các nhóm không có dòng nào được thực thi: T-C, T-E, T-H, T-R, T-O, T-B, T-S, T-V, T-A, T-TR, T-Z. T-F chỉ được thực thi cho T-F08 và T-F14; T-U chỉ cho các kiểm thử ghi nhận kiểm toán và relay được liệt kê ở D.2.
 
@@ -2846,17 +2947,17 @@ Trạng thái bằng chứng: **Đã thực thi (sandbox, tham chiếu)** nghĩa
 |---|---|---|---|---|---|---|
 | Phân công được giữ lại của thành viên `SUSPENDED` không trao gì; `REMOVED` thu hồi và không bao giờ được khôi phục | P1-1‡ | Tra cứu grant (8.7), bước B2 của PDP, trigger `membership_ended` | DDL; truy vấn grant tham chiếu; các đường tham chiếu trong harness | T-M08 đến T-M12, T-M01, T-M02, T-G07 | Đã thực thi (sandbox, tham chiếu) | PDP của sản phẩm chưa triển khai; T-M04 chỉ mới đặc tả |
 | Chỉ tư cách thành viên `ACTIVE` mới nhận phân công mới | P1-1‡ | Trigger `trg_tenant_assignment_integrity` với `FOR SHARE` | DDL | T-X05, T-M03, T-M05 | Đã thực thi (sandbox, tham chiếu) | Các mức cô lập khác READ COMMITTED chưa được kiểm chứng |
-| Kiểm tra tư cách thành viên áp dụng trên mọi đường (đơn lẻ, danh sách, hàng loạt, tác vụ, xuất) | P1-1‡ | Một đường đánh giá (8.5.3, 11.5) | Bốn đường tham chiếu với một điểm nghẽn | T-M08 đến T-M12 (tham chiếu), T-M18 (sản phẩm) | Tham chiếu đã thực thi; sản phẩm chỉ mới đặc tả | Cho thấy thiết kế hoạt động, không chứng minh sản phẩm đã có |
+| Kiểm tra tư cách thành viên áp dụng trên mọi đường (đơn lẻ, danh sách, hàng loạt, tác vụ, xuất) | P1-1‡ | Một đường đánh giá (8.5.3, 11.5) | Bốn đường tham chiếu với một điểm chặn tập trung | T-M08 đến T-M12 (tham chiếu), T-M18 (sản phẩm) | Tham chiếu đã thực thi; sản phẩm chỉ mới đặc tả | Cho thấy thiết kế hoạt động, không chứng minh sản phẩm đã có |
 | `ended_at` được đặt khi và chỉ khi `REMOVED`; idempotent; bất biến khi đã bị loại bỏ | P2-2‡ | `CHECK memberships_ended_at_ck`, trigger `membership_before` | DDL | T-M13 đến T-M17, T-MIG03 | Đã thực thi (sandbox, tham chiếu) | Role có đặc quyền có thể vô hiệu hóa trigger; `CHECK` vẫn áp dụng |
 | Thay đổi tư cách thành viên và phân công tạo sự kiện lớp A trong cùng giao dịch | P1-2‡ | Trigger `audit_membership`, `audit_*_assignment`; `audit_emit` | DDL | T-U09, T-U10, T-U11 | Đã thực thi (sandbox, tham chiếu) | Vượt rào đặc quyền không được ghi nhận (T-U12); các thay đổi lớp A khác chưa được bao phủ |
 | Lỗi lưu outbox làm rollback thao tác | P1-2‡ | Cùng giao dịch | DDL | T-U13, T-F08, T-U01 | Đã thực thi (sandbox, tham chiếu) | Không có dịch vụ của sản phẩm |
 | Relay hoặc sink ngừng hoạt động, thử lại, phục hồi, phân phối trùng lặp | P1-2‡ | Relay và ràng buộc duy nhất của sink | Relay và sink mô phỏng trong harness | T-U14, T-U15, T-F14, T-U06, T-U02 | Đã thực thi trên mô phỏng | Relay và sink thật chưa triển khai |
 | Đối soát phát hiện vượt rào đặc quyền | P1-2‡ | Tác vụ định kỳ được đề xuất | Hai truy vấn tham chiếu trong harness | T-U12 (truy vấn); T-U17 (tác vụ) | Truy vấn đã thực thi; tác vụ chỉ mới đặc tả | Tác vụ, chu kỳ, cảnh báo, truy cập sink chưa triển khai |
 | Ngữ nghĩa mất mát của lớp B và D; thứ tự đọc lớp C | P1-2‡ | Hàng đợi cục bộ, PEP, dịch vụ | Không có | T-U16, T-U07, T-F13 | Chỉ mới đặc tả | Không có tạo phẩm |
-| Quyền sở hữu vai trò, đặt tên khóa, tính bất biến, dữ liệu khởi tạo | P2-3‡ | Các `CHECK`, trigger bất biến, trigger phân công | DDL; tệp dữ liệu khởi tạo | T-RO01 đến T-RO11, T-M06, T-MIG01 | Đã thực thi (sandbox, tham chiếu) | Không có dữ liệu khởi tạo hay di trú của sản phẩm |
+| Quyền sở hữu vai trò, đặt tên khóa, tính bất biến, dữ liệu khởi tạo | P2-3‡ | Các `CHECK`, trigger bất biến, trigger phân công | DDL; tệp dữ liệu khởi tạo | T-RO01 đến T-RO07, T-RO09 đến T-RO11, T-M06, T-MIG01 | Đã thực thi (sandbox, tham chiếu) | T-RO08 (lint) chỉ mới đặc tả; không có dữ liệu khởi tạo hay di trú của sản phẩm |
 | Khóa vai trò nhất quán trong toàn tài liệu | P2-3‡ | Kiểm tra tài liệu | `doc_consistency_check.py` | T-RO12 | Đã thực thi | Chỉ bao phủ tài liệu này |
 | Kiểu tĩnh của FilterPlan cụ thể theo trường (chỉ là hướng dẫn) | P2-1‡ | Kiểu TypeScript | `filterplan_types.ts` | T-P20, T-P21, T-P23 | Đã thực thi với tsc 6.0.3 | Dữ liệu qua mạng và ép kiểu không được kiểm tra |
-| Kiểm tra FilterPlan lúc chạy trước khi chuyển đổi | P2-1‡ | Bộ kiểm tra lúc chạy (có thẩm quyền) | Bộ kiểm tra tham chiếu trong harness | T-P01 đến T-P19, T-P22 | Đã thực thi trên bộ kiểm tra tham chiếu | Bộ kiểm tra của sản phẩm chưa được kiểm thử |
+| Kiểm tra FilterPlan lúc chạy trước khi chuyển đổi | P2-1‡ | Bộ kiểm tra lúc chạy (có thẩm quyền) | Bộ kiểm tra tham chiếu trong harness | T-P01 đến T-P07, T-P09 đến T-P15, T-P18, T-P19, T-P22 | Đã thực thi trên bộ kiểm tra tham chiếu | T-P08, T-P16, T-P17 chỉ mới đặc tả; bộ kiểm tra của sản phẩm chưa được kiểm thử |
 | Điều kiện tenant được tầng dữ liệu chèn vào; truy vấn không được bảo vệ bị từ chối | v1.3 P1-4 | Tầng truy cập dữ liệu | Cơ chế chặn tham chiếu | T-P03, T-P12 | Đã thực thi (sandbox, tham chiếu) | Tầng dữ liệu của sản phẩm chưa được kiểm thử |
 | Không gian tên ngữ cảnh của quyền; ngữ cảnh vai trò-quyền | v1.4 P2-3† | Các `CHECK` và khóa ngoại phức hợp | DDL | T-X10, T-N01 | Đã thực thi (sandbox, tham chiếu) | Lint và xử lý lúc chạy (T-N02 đến T-N06) chỉ mới đặc tả |
 | Di trú sang các bất biến | P1-1‡, P2-2‡ | Script | Cơ sở dữ liệu nháp trong harness | T-MIG01 đến T-MIG03 | Đã thực thi trên cơ sở dữ liệu nháp | Không có dữ liệu thật |
@@ -2872,11 +2973,11 @@ Trạng thái bằng chứng: **Đã thực thi (sandbox, tham chiếu)** nghĩa
 
 | Kiểm tra | Kết quả | Bằng chứng hoặc lý do |
 |---|---|---|
-| Quyền sở hữu vai trò và bất biến vai trò tenant/hệ thống | PASS (DDL tham chiếu) | T-RO01 đến T-RO11 và 94 kiểm thử v1.4 không đổi vẫn đạt trên DDL đã thay đổi |
-| Điều kiện phân công và vòng đời tư cách thành viên | PASS (DDL và các đường tham chiếu) | T-X05, T-M01 đến T-M17 |
-| Phân quyền trên các đường đơn lẻ, tập hợp, hàng loạt, nền | PASS cho điểm nghẽn tham chiếu; NOT VERIFIED cho các đường của sản phẩm | T-M08 đến T-M12; không có mã sản phẩm (T-M18) |
+| Quyền sở hữu vai trò và bất biến vai trò tenant/hệ thống | PASS (DDL tham chiếu) | T-RO01 đến T-RO07, T-RO09 đến T-RO11 (T-RO08 chỉ mới đặc tả), và 94 kiểm thử v1.4, vốn đạt trên DDL đã thay đổi (những kiểm thử liên quan đến truy vấn 8.6 đã sửa và ngữ nghĩa vòng đời đã được cập nhật trong v1.4.1, xem D.1) |
+| Điều kiện phân công và vòng đời tư cách thành viên | PASS (DDL và các đường tham chiếu) | T-X05, T-M01 đến T-M03, T-M05, T-M06, T-M08 đến T-M17 (T-M04 và T-M07 chỉ mới đặc tả) |
+| Phân quyền trên các đường đơn lẻ, tập hợp, hàng loạt, nền | PASS cho điểm chặn tập trung tham chiếu; NOT VERIFIED cho các đường của sản phẩm | T-M08 đến T-M12; không có mã sản phẩm (T-M18) |
 | Lớp kiểm toán, ngữ nghĩa outbox, hành vi khi sink ngừng hoạt động | PASS cho ngữ nghĩa outbox lớp A và C trên DDL tham chiếu và relay mô phỏng; NOT VERIFIED cho phần còn lại | T-U01, T-U09 đến T-U15, T-F08, T-F14; không có hàng đợi lớp B, đường đọc lớp C, relay hay sink thật (T-U07, T-U16, T-F13) |
-| Kiểm tra FilterPlan lúc chạy trước khi thực thi | PASS (bộ kiểm tra tham chiếu) | T-P01 đến T-P19, T-P22; NOT VERIFIED cho bộ kiểm tra của sản phẩm |
+| Kiểm tra FilterPlan lúc chạy trước khi thực thi | PASS (bộ kiểm tra tham chiếu) | T-P01 đến T-P07, T-P09 đến T-P15, T-P18, T-P19, T-P22; T-P08, T-P16, T-P17 chỉ mới đặc tả; NOT VERIFIED cho bộ kiểm tra của sản phẩm |
 | `tenant_access_denied` và hợp đồng gợi ý tenant | NOT VERIFIED | Không có tạo phẩm HTTP (T-A01, T-A09 đến T-A13 chỉ mới đặc tả) |
 | Ân hạn cache và chính sách độ cũ | NOT VERIFIED | Không có tạo phẩm cache hay PDP (T-V chỉ mới đặc tả) |
 | Không gian tên `platform.` và tính nhất quán ngữ cảnh quyền | PASS cho các kiểm tra cơ sở dữ liệu; NOT VERIFIED cho lint và lúc chạy | T-N01, T-X10, T-RO09; T-N02 đến T-N06 chưa chạy |

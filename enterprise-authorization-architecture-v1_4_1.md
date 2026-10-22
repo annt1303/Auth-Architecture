@@ -17,9 +17,9 @@ Appendices at the end: A (change logs), B (finding resolution matrices), C (assu
 
 ### Document scope and evidence levels
 
-This document contains several kinds of content. They are different things, and v1.4 labels them separately so that a specification is not mistaken for a verified system.
+This document contains several kinds of content. They are different things, and v1.4.1 labels them separately so that a specification is not mistaken for a verified system.
 
-| Level | Meaning | Where | Status in v1.4 |
+| Level | Meaning | Where | Status in v1.4.1 |
 |---|---|---|---|
 | Reference architecture | Components, responsibilities, invariants, decisions | Sections 1 to 7, 9 to 23, 26 | Specified |
 | Implementation specification | Contracts precise enough for two teams to build compatibly: types, algorithms, tables, error codes | Sections 8, 10 to 15, 22, 23 | Specified |
@@ -40,7 +40,7 @@ Status vocabulary used in the test tables of section 24: implementation status `
 |---|---|
 | 1.2 | Restored baseline, terminology, diagram, tenant model, worked example, HTTP rules, TOCTOU; fixed schema/algorithm inconsistencies |
 | 1.3 | Combining algorithm, platform vs tenant assignments, trusted context, failure matrix, FilterPlan, obligations, bulk, audit classes, revocation table, test catalog |
-| 1.4 | Role ownership and membership invariants with DB enforcement; audit outbox semantics; typed FilterPlan with runtime validation; tenant-membership HTTP contract; cache grace aligned with the staleness SLA; permission context namespace; evidence levels and executed reference tests (Appendix A) |
+| 1.4 | Role ownership and membership invariants with DB enforcement; audit outbox semantics; typed FilterPlan with runtime validation; tenant-membership HTTP contract; cache grace aligned with the staleness SLA; permission context namespace; evidence levels and executed reference tests (Appendix A.2) |
 | 1.4.1 | Corrective revision: stored assignment state versus effective authorization (suspension, reinstatement, removal); audit guarantees scoped to the event classes and trusted write boundary, with database-level audit capture for membership and assignment changes; FilterPlan types made field-specific with runtime validation kept authoritative; `ended_at` enforced by the database; role ownership examples, seed data, and naming made consistent; evidence matrix and checks re-run (Appendix A.1) |
 
 
@@ -290,8 +290,8 @@ Administrative permissions are where tenant and platform meanings were easiest t
 | Key | Context | Meaning | Risk |
 |---|---|---|---|
 | `role.read` | TENANT | Read roles and their permissions visible in the context tenant | LOW |
-| `role.manage` | TENANT | Create, change, delete tenant custom roles and their permission sets | HIGH |
-| `user_role.assign` | TENANT | Create tenant role assignments in the context tenant, within the granter's own authority | HIGH |
+| `role.manage` | TENANT | Create, change, delete tenant custom roles and their permission sets, limited to permissions the actor holds (7.8) | HIGH |
+| `user_role.assign` | TENANT | Create tenant role assignments in the context tenant, within the granter's own authority (7.8) | HIGH |
 | `user_role.revoke` | TENANT | Revoke tenant role assignments in the context tenant | HIGH |
 | `tenant_membership.manage` | TENANT | Add, suspend, and remove memberships in the context tenant | HIGH |
 | `authz.deny.manage` | TENANT | Create explicit denies (only if A1 is enabled) | HIGH |
@@ -319,7 +319,7 @@ Administrative permissions are where tenant and platform meanings were easiest t
 
 | Situation | Result | Mechanism | Test |
 |---|---|---|---|
-| Action is not in the catalog | `INDETERMINATE / UNKNOWN_PERMISSION`; HTTP 500, alert (a caller defect, never a user error). A build step must also check that every action declared in code exists in the catalog | PDP step A4 (section 11.3); CI check | T-N03 |
+| Action is not in the catalog | `INDETERMINATE / UNKNOWN_PERMISSION`; HTTP 500, alert (a caller defect, never a user error). A build step must also check that every action declared in code exists in the catalog | PDP step PA4 (section 11.3); CI check | T-N03 |
 | Known permission whose context kind differs from the request's context kind | `DENY / CONTEXT_KIND_MISMATCH` | PDP step B3 | T-N04 |
 | Role mapping mixes contexts (a tenant role containing a `platform.` permission) | Rejected at write time | `role_permissions` `CHECK` and composite foreign keys (section 8.3) | T-X10 (executed) |
 | Deprecated permission | Still evaluated normally; usage is counted and logged | Catalog `deprecated_at` | T-N05 |
@@ -405,6 +405,17 @@ AND
 - If role inheritance is supported: define parent-child relationships, prevent or detect cycles, limit depth, define precedence and conflict handling, define cache invalidation when the hierarchy changes, audit hierarchy changes, and test multi-level inheritance and cycles.
 - Neither belongs in the baseline unless required.
 
+### 7.8 Authority to define roles and to grant them [Baseline]
+
+Rule: a principal may create or change a custom role, or create an assignment, only within the authority it effectively holds. "Own authority" has one definition here: the set of (permission, scope) pairs that the principal's effective grants (8.5.1) confer in the context tenant at the time of the action.
+
+- **Role definition (`role.manage`).** A custom role may contain only permissions that the acting principal effectively holds. A permission the actor does not hold cannot be added, even though `role.manage` is held.
+- **Assignment (`user_role.assign`).** The assigned role's permissions must each be held by the granter, and the assignment scope must be covered by the granter's scope for each of those permissions.
+- **No self-grant.** A principal cannot create an assignment for itself. Granting to self requires a second, different approver recorded in `approval_reference`.
+- **Shared template roles** are changed only with `platform.role.manage` (8.2.1).
+
+Invariant: no sequence of baseline operations lets a principal obtain a (permission, scope) pair that no principal acting in good standing held before. Mechanism: the PDP evaluates the subset rule in the same trusted path as every other decision (the role-management and assignment endpoints call it with the role's permission set and scope as resource attributes). Test: T-M19 to T-M21 (specified only). The optional governance mechanisms of section 21 add approval workflows on top; they do not replace this rule.
+
 ---
 
 ## 8. Logical data model and invariants
@@ -439,14 +450,14 @@ Tier: **B** = baseline, **O** = optional, **L** = later phase.
 | `tenant_role_assignments` | B | PK `id`; partial unique (see 8.4) | `tenant_id`; `(tenant_id, principal_id)` -> memberships; `(role_id, role_kind)` -> roles | `tenant_id NOT NULL`; role must be `TENANT` kind and (system-defined or owned by the same tenant), and membership must be `ACTIVE` when the assignment is created, both enforced by trigger (8.3); scope fields per 7.3; lifecycle fields per 7.5 |
 | `platform_role_assignments` | B | PK `id`; partial unique | `principal_id`; `(role_id, role_kind)` -> roles | **No `tenant_id`, no scope.** Role must be `PLATFORM` kind. `approval_reference` required |
 | `principal_permissions` | O (Option B) | PK `id` | as tenant assignments | Direct grants, tenant context only |
-| `principal_denies` | O (A1) | PK `id` | as tenant assignments | Explicit deny, tenant context only; `reason` and `approval_reference` required; created only by holders of a high-risk permission such as `authz.deny.manage` |
+| `principal_denies` | O (A1) | PK `id` | as tenant assignments | Explicit deny, tenant context only; `reason` and `approval_reference` required; created only by holders of the high-risk permission `authz.deny.manage` |
 | `resource_relationships` | O | PK `id` | `tenant_id` | `(subject, relation, object)` with status and validity; tenant-bound |
 | `delegation_records` | O | PK `id` | `tenant_id`, actor, represented principal | Allowed permissions/scope, validity, status, `created_by` (only if delegation is stored rather than carried in tokens) |
 | `support_sessions` | O | PK `id` | `tenant_id`, platform principal | Limited role, `approved_by`, validity, status (section 19) |
 | `catalog_versions` | L | PK `version` | - | `published_at`, `published_by`, `checksum` (section 26) |
 | `authorization_change_events`, `access_decision_events`, `audit_outbox` | B | PK `event_id` | - | Section 22. Events for membership and assignment changes are written by database triggers (8.3, 22.6) |
 
-Cross-cutting rules: every tenant-owned table carries `tenant_id NOT NULL`; timestamps are UTC; soft-delete or revocation is preferred to destructive deletion where auditability matters; no `NULL`, missing field, and empty string carry different meanings unless this document says so (here, `NULL scope_id` is meaningful only for `TENANT` and `SELF`).
+Cross-cutting rules: every tenant-owned table carries `tenant_id NOT NULL`; timestamps are UTC; soft-delete or revocation is preferred to destructive deletion where auditability matters; no `NULL`, missing field, and empty string carry different meanings unless this document says so (here, `NULL scope_id` is meaningful only for `TENANT` and `SELF`; for every other scope type `scope_id` is non-empty, enforced by a `CHECK`).
 
 ### 8.2.1 Role ownership invariants
 
@@ -496,7 +507,8 @@ Needs adaptation for other engines: `NULLS NOT DISTINCT` (PostgreSQL 15+; elsewh
 Known gaps in this DDL:
 
 - A database owner or superuser can disable the triggers (`ALTER TABLE ... DISABLE TRIGGER`, `session_replication_role = replica`). The DDL cannot prevent that; section 22.6 states the consequence and the detection that is proposed.
-- The audit triggers capture class A events for membership and assignment changes only. Other class A changes (roles, permissions, policy and catalog publication, support sessions, transfers) must be written to `audit_outbox` by the trusted service in the same transaction, which this DDL does not do for them.
+- The audit triggers capture class A events for membership status changes and for assignment creation, status changes, and changes to any other column (validity window, scope, role, principal, approval reference). They do not capture `DELETE`; the reference application role has no `DELETE` or `TRUNCATE` privilege. The `app.actor_id` setting is **asserted** by the writer, not authenticated: `actor_attributed = true` means an actor was claimed, and `db_user` records the connecting role.
+- Other class A changes (roles, permissions, policy and catalog publication, support sessions, transfers) must be written to `audit_outbox` by the trusted service in the same transaction, which this DDL does not do for them.
 - The class B local queue, class C read/export events, and the relay are not part of this DDL.
 - `created_by` and `revoked_by` are not foreign keys; `updated_at` is not maintained automatically; the outbox purge job is not defined; READ COMMITTED is assumed (8.5).
 
@@ -603,6 +615,7 @@ CREATE TABLE tenant_role_assignments (
     REFERENCES tenant_memberships (tenant_id, principal_id),
   FOREIGN KEY (role_id, role_kind) REFERENCES roles (id, role_kind),
   CHECK ((scope_type IN ('TENANT','SELF')) = (scope_id IS NULL)),
+  CHECK (scope_id IS NULL OR scope_id <> ''),
   CHECK (valid_from IS NULL OR valid_until IS NULL OR valid_until > valid_from),
   CHECK ((status = 'REVOKED') = (revoked_at IS NOT NULL))
 );
@@ -616,7 +629,8 @@ CREATE UNIQUE INDEX uq_active_tenant_assignment
 -- audit capture below hold for every writer, including roles that have no privilege on the tables
 -- these functions touch (audit_outbox, tenant_memberships, tenant_role_assignments).
 
--- Role ownership and ACTIVE-membership invariants for tenant assignments (new assignments only).
+-- Role ownership and ACTIVE-membership invariants for tenant assignments (new assignments, and
+-- ACTIVE assignments whose principal or tenant changes).
 CREATE FUNCTION trg_tenant_assignment_integrity() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
@@ -641,7 +655,10 @@ BEGIN
 
   -- Only an ACTIVE membership may RECEIVE a new ACTIVE assignment. Stored assignments of a
   -- SUSPENDED membership are preserved but are not effective (see section 8.5).
-  IF NEW.status = 'ACTIVE' AND (TG_OP = 'INSERT' OR OLD.status <> 'ACTIVE') THEN
+  -- Also when an ACTIVE row is re-pointed to another principal or tenant (R1, R4).
+  IF NEW.status = 'ACTIVE' AND (TG_OP = 'INSERT' OR OLD.status <> 'ACTIVE'
+      OR NEW.principal_id IS DISTINCT FROM OLD.principal_id
+      OR NEW.tenant_id IS DISTINCT FROM OLD.tenant_id) THEN
     -- FOR SHARE blocks a concurrent membership status change until this transaction ends
     SELECT status INTO m_status FROM tenant_memberships
      WHERE tenant_id = NEW.tenant_id AND principal_id = NEW.principal_id
@@ -676,6 +693,14 @@ BEGIN
         USING ERRCODE = 'check_violation';
     END IF;
   ELSIF OLD.status = 'REMOVED' AND NEW.status <> 'REMOVED' THEN
+    -- stale ACTIVE assignments (left by a privileged bypass) must be revoked before reinstatement,
+    -- otherwise reinstatement would silently restore them
+    IF EXISTS (SELECT 1 FROM tenant_role_assignments
+                WHERE tenant_id = NEW.tenant_id AND principal_id = NEW.principal_id
+                  AND status = 'ACTIVE') THEN
+      RAISE EXCEPTION 'membership has ACTIVE assignments; revoke them before reinstatement'
+        USING ERRCODE = 'check_violation';
+    END IF;
     NEW.ended_at := NULL;
   END IF;
   RETURN NEW;
@@ -691,7 +716,8 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
   IF NEW.status = 'REMOVED' AND OLD.status <> 'REMOVED' THEN
     UPDATE tenant_role_assignments
-       SET status = 'REVOKED', revoked_at = now(), reason = 'MEMBERSHIP_ENDED'
+       SET status = 'REVOKED', revoked_at = now(), reason = 'MEMBERSHIP_ENDED',
+           revoked_by = NULLIF(current_setting('app.actor_id', true), '')::uuid
      WHERE tenant_id = NEW.tenant_id AND principal_id = NEW.principal_id
        AND status = 'ACTIVE';
   END IF;
@@ -723,6 +749,26 @@ CREATE TABLE platform_role_assignments (
 CREATE UNIQUE INDEX uq_active_platform_assignment
   ON platform_role_assignments (principal_id, role_id)
   WHERE status = 'ACTIVE';
+
+-- A revoked platform assignment is terminal, and the identity of an assignment never changes:
+-- the highest-privilege table gets the same protection as tenant assignments.
+CREATE FUNCTION trg_platform_assignment_integrity() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF OLD.status = 'REVOKED' AND NEW.status <> 'REVOKED' THEN
+    RAISE EXCEPTION 'a revoked assignment cannot be reactivated; create a new assignment'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  IF NEW.principal_id IS DISTINCT FROM OLD.principal_id
+     OR NEW.role_id IS DISTINCT FROM OLD.role_id THEN
+    RAISE EXCEPTION 'principal and role of a platform assignment are immutable; create a new assignment'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER platform_assignment_integrity
+  BEFORE UPDATE ON platform_role_assignments
+  FOR EACH ROW EXECUTE FUNCTION trg_platform_assignment_integrity();
 
 -- Audit outbox: lives in the same database as the data whose change it records.
 CREATE TABLE audit_outbox (
@@ -786,6 +832,13 @@ BEGIN
       'assignment_id', NEW.id, 'principal_id', NEW.principal_id,
       'tenant_id', to_jsonb(NEW) -> 'tenant_id',
       'old_status', OLD.status, 'new_status', NEW.status, 'assignment_reason', NEW.reason));
+  ELSIF to_jsonb(NEW) - 'status' - 'revoked_at' - 'revoked_by' - 'reason'
+        IS DISTINCT FROM to_jsonb(OLD) - 'status' - 'revoked_at' - 'revoked_by' - 'reason' THEN
+    -- any change to a security-relevant column (validity window, scope, role, principal,
+    -- approval reference) is a privilege change and is recorded with old and new values
+    PERFORM audit_emit(TG_TABLE_NAME || '.modified', jsonb_build_object(
+      'assignment_id', NEW.id, 'tenant_id', to_jsonb(NEW) -> 'tenant_id',
+      'old', to_jsonb(OLD), 'new', to_jsonb(NEW)));
   END IF;
   RETURN NULL;
 END $$;
@@ -803,6 +856,10 @@ REVOKE ALL ON audit_outbox FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION audit_emit(text, jsonb) FROM PUBLIC;
 GRANT SELECT, INSERT, UPDATE ON tenant_memberships, tenant_role_assignments TO authz_app;
 GRANT SELECT ON principals, tenants, permissions, roles, role_permissions TO authz_app;
+-- No DELETE and no TRUNCATE is granted on any table, so history cannot be removed by this role.
+-- Writes to roles and role_permissions (custom roles, 8.2.1) and to platform_role_assignments go
+-- through separate service roles (for example authz_role_admin, authz_platform_admin), created and
+-- granted per environment; they are not defined here because roles are cluster-level.
 ```
 
 Seed data (system-defined roles and the document catalog of 27.4; companion file `authz_v1_4_1_reference_seed.sql`):
@@ -820,7 +877,7 @@ INSERT INTO permissions (id, key, context_kind, resource_type, action, risk_leve
   (gen_random_uuid(), 'user_role.assign',               'TENANT',   'user_role',         'assign',        'HIGH'),
   (gen_random_uuid(), 'user_role.revoke',               'TENANT',   'user_role',         'revoke',        'HIGH'),
   (gen_random_uuid(), 'tenant_membership.manage',       'TENANT',   'tenant_membership', 'manage',        'HIGH'),
-  (gen_random_uuid(), 'authz.deny.manage',              'TENANT',   'authz',             'deny.manage',   'HIGH'),
+  (gen_random_uuid(), 'authz.deny.manage',              'TENANT',   'authz.deny',        'manage',        'HIGH'),
   (gen_random_uuid(), 'authorization_audit.read',       'TENANT',   'authorization_audit','read',         'HIGH'),
   (gen_random_uuid(), 'platform.tenant.create',         'PLATFORM', 'tenant',            'create',        'HIGH'),
   (gen_random_uuid(), 'platform.tenant.suspend',        'PLATFORM', 'tenant',            'suspend',       'HIGH'),
@@ -862,7 +919,7 @@ Why two assignment tables instead of one with a nullable `tenant_id` (decision D
 
 ### 8.4 Re-grant and uniqueness
 
-The partial unique indexes `uq_active_tenant_assignment` and `uq_active_platform_assignment` (section 8.3) allow a revoked assignment to be granted again as a **new row**, while preventing two `ACTIVE` rows for the same principal, role, and scope. A revoked assignment is terminal: it cannot be reactivated (trigger), so history is never rewritten.
+The partial unique indexes `uq_active_tenant_assignment` and `uq_active_platform_assignment` (section 8.3) allow a revoked assignment to be granted again as a **new row**, while preventing two `ACTIVE` rows for the same principal, role, and scope. A revoked assignment is terminal: it cannot be reactivated (trigger on both assignment tables), so history is never rewritten.
 
 `scope_id` is NULL for `TENANT` and `SELF` scopes, so the tenant index needs `NULLS NOT DISTINCT` (PostgreSQL 15+, Assumption A8). On older versions use an expression index with `COALESCE(scope_id, '')` or separate partial indexes. A partial index on `ACTIVE` does not prevent overlapping validity windows; if you need scheduled grants or history, define temporal-uniqueness rules separately. Tests: T-X14 (executed in the sandbox).
 
@@ -891,8 +948,8 @@ A stored `ACTIVE` assignment is therefore not necessarily effective. The referen
 | Suspend | `ACTIVE` to `SUSPENDED` (reversible) | Stay `ACTIVE` | **No**, while suspended | Trusted service; no cascade; same invalidation event as removal (23.1) |
 | Reinstate | `SUSPENDED` to `ACTIVE` | Unchanged | Yes, if still valid (R3) | Trusted service |
 | Remove | to `REMOVED`; `ended_at` set | Every `ACTIVE` one becomes `REVOKED`, reason `MEMBERSHIP_ENDED` | No, permanently | `AFTER UPDATE` trigger `membership_ended`, same transaction |
-| Re-add after removal | `REMOVED` to `ACTIVE` (same row); `ended_at` cleared | Old ones stay `REVOKED` | No, until new grants | Trusted service |
-| Create an assignment while `SUSPENDED` or `REMOVED` | unchanged | Rejected | - | `BEFORE INSERT` trigger on `tenant_role_assignments` (R1) |
+| Re-add after removal | `REMOVED` to `ACTIVE` (same row); `ended_at` cleared | Old ones stay `REVOKED`; refused if any `ACTIVE` one remains | No, until new grants | Trusted service; guard in `membership_before` |
+| Create an assignment while `SUSPENDED` or `REMOVED` | unchanged | Rejected | - | `BEFORE INSERT OR UPDATE` trigger on `tenant_role_assignments` (R1) |
 
 Decisions and reasons:
 
@@ -987,7 +1044,7 @@ WHERE a.tenant_id = :context_tenant AND a.principal_id = :principal AND a.status
   AND (a.valid_until IS NULL OR :now < a.valid_until);
 ```
 
-The query reads the tenant assignment table only. Platform grants come from `platform_role_assignments` and are selected by `context_kind`, never mixed with these rows. `:now` must come from the server's clock (or the database clock) consistently, never from the client.
+The query reads no platform table: it uses the tenant assignment, membership, and catalog tables only. Principal status (`principals.status`) and tenant status are not part of it; they are checked by PDP steps B1 and B2. Platform grants come from `platform_role_assignments` and are selected by `context_kind`, never mixed with these rows. `:now` must come from the server's clock (or the database clock) consistently, never from the client.
 
 ---
 
@@ -1096,6 +1153,7 @@ Policy and constraints may use only attributes registered here. Add one row per 
 
 Rules:
 
+- An absent `principals` or `tenant_memberships` row is a **defined value**, not a missing attribute: it gives `DENY / PRINCIPAL_INACTIVE` or `DENY / NOT_A_MEMBER` (10.3, B1, B2).
 - A **required** attribute that is missing, malformed, or unobtainable from its authoritative source makes the result `INDETERMINATE` (cause `MISSING_REQUIRED_ATTRIBUTE` or `EVALUATION_FAILURE`). Never default it to a permissive value. It also raises an alert, because it usually indicates a data defect.
 - An **optional** attribute that is absent is "unknown"; any constraint depending on it fails closed.
 - Distinguish data used for business logic from data allowed to justify access. Only the "usable in policy" rows above may be used for the latter.
@@ -1142,7 +1200,7 @@ type EvaluationResult = {
   reasonCode: ReasonCode;
   matchedGrantIds: string[];
   obligations: Obligation[];
-  filterPlan?: FilterPlan;
+  filterPlan?: AuthzPlan;         // AuthzPlan is defined in 13.2
   policyVersion: string;
   failedDependency?: string;
 };
@@ -1165,7 +1223,7 @@ type Decision = {
 | `ALLOW` | `ALLOW_GRANT` | `ALLOW` | false | Enforce obligations, then proceed | PDP, PEP, audit |
 | `DENY` | `OUT_OF_SCOPE`, `NOT_A_MEMBER`, `TENANT_SUSPENDED`, `TENANT_MISMATCH`, `PRINCIPAL_INACTIVE`, `CONTEXT_KIND_MISMATCH`, `CONSTRAINT_FAILED`, `EXPLICIT_DENY` | `DENY` | false | Refuse; HTTP per section 12 | PDP, PEP (log), audit |
 | `NOT_APPLICABLE` | `NO_GRANT` | `DENY` | false | Refuse; HTTP per section 12 | PDP, PEP (log), audit |
-| `INDETERMINATE` | `EVALUATION_FAILURE`, `MISSING_REQUIRED_ATTRIBUTE`, `UNKNOWN_PERMISSION` | `DENY` | true | Refuse; 503 or 500; alert | PDP, PEP (log), audit |
+| `INDETERMINATE` | `EVALUATION_FAILURE`, `MISSING_REQUIRED_ATTRIBUTE`, `UNKNOWN_PERMISSION` | `DENY` | true | Refuse; 503 (dependency failure) or 500 (`UNKNOWN_PERMISSION` and other defects); alert | PDP, PEP (log), audit |
 
 Rules:
 
@@ -1177,15 +1235,15 @@ Rules:
 
 **Chosen algorithm: deny-overrides over mandatory constraints (and over explicit deny when A1 is enabled); otherwise an explicit allow is required.** Baseline (role-only, no explicit deny) evaluation, in this order:
 
-**Phase A: context.**
-A1. If authentication is invalid, stop: 401 (not an authorization decision).
-A2. If the request is malformed, stop: 400/422.
-A3. Build the trusted context. If a required attribute cannot be obtained because of a dependency failure or defect, state = `INDETERMINATE`.
-A4. Check that `action` is a key of the permission catalog; otherwise state = `INDETERMINATE / UNKNOWN_PERMISSION` (a caller defect, section 6.4).
+**Phase A: context** (steps PA1 to PA4; the prefix keeps them distinct from Assumptions A1 to A16).
+PA1. If authentication is invalid, stop: 401 (not an authorization decision).
+PA2. If the request is malformed, stop: 400/422.
+PA3. Build the trusted context. If a required attribute cannot be obtained because of a dependency failure or defect, state = `INDETERMINATE`.
+PA4. Check that `action` is a key of the permission catalog; otherwise state = `INDETERMINATE / UNKNOWN_PERMISSION` (a caller defect, section 6.4).
 
 **Phase B: invariants** (all must hold; a failure here is final and cannot be overridden by any grant).
 B1. Principal exists and is `ACTIVE`, else `DENY / PRINCIPAL_INACTIVE`.
-B2. For `TENANT` context: the tenant is `ACTIVE`, else `DENY / TENANT_SUSPENDED`; the membership is `ACTIVE`, else `DENY / NOT_A_MEMBER`. One lookup answers both, and both map to the same HTTP response (12.4). A `SUSPENDED` membership is denied here even though its stored assignments remain `ACTIVE` (8.5).
+B2. For `TENANT` context: the tenant is `ACTIVE`, else `DENY / TENANT_SUSPENDED`; the membership is `ACTIVE`, or an `ACTIVE`, unexpired support session binds the principal to the tenant (section 19), else `DENY / NOT_A_MEMBER`. One lookup answers both, and both map to the same HTTP response (12.4). A `SUSPENDED` membership is denied here even though its stored assignments remain `ACTIVE` (8.5).
 B3. The requested permission's context kind equals `contextKind`, else `DENY / CONTEXT_KIND_MISMATCH`.
 B4. For instance actions: resource tenant equals `tenantId` (already guaranteed by the tenant-predicated lookup; a miss is "not found", mapped in section 12), else `DENY / TENANT_MISMATCH`.
 
@@ -1200,7 +1258,7 @@ D1. If any applicable explicit deny exists: `DENY / EXPLICIT_DENY`. This takes p
 D2. Else if any lookup in C failed: `INDETERMINATE / EVALUATION_FAILURE`.
 D3. Else if there are no grants: `NOT_APPLICABLE / NO_GRANT`.
 D4. Else compute the effective scope set (union of covering scopes, section 9). For an instance action, if no grant covers the resource: `DENY / OUT_OF_SCOPE`. For a collection action, produce the `FilterPlan` from the union.
-D5. If any mandatory constraint fails: `DENY / CONSTRAINT_FAILED`.
+D5. If any mandatory constraint fails: `DENY / CONSTRAINT_FAILED`. For a collection or bulk action there is no single resource instance: constraints on resource attributes (state, classification) must be expressible as predicates and are added to the `FilterPlan` with `AND`. A constraint that cannot be expressed as a plan predicate (SoD, relationship, per-instance checks) is evaluated per item, or the action is refused with `CONSTRAINT_FAILED`; it is never skipped.
 D6. Otherwise `ALLOW / ALLOW_GRANT`.
 
 **Phase E: obligations.** Merge obligations from matched grants, policies, and constraints (section 14). The PEP verifies that it can enforce every mandatory obligation; otherwise it refuses with `OBLIGATION_UNSUPPORTED`.
@@ -1277,6 +1335,9 @@ Rule for tenant selection: the tenant hint is the caller's own assertion about w
 | Tenant exists, principal has no membership | `DENY / NOT_A_MEMBER` | 403 | `tenant_access_denied` | Nothing |
 | Membership `SUSPENDED` or `REMOVED` (including removed during a session) | `DENY / NOT_A_MEMBER` | 403 | `tenant_access_denied` | Nothing |
 | Tenant itself suspended | `DENY / TENANT_SUSPENDED` | 403 | `tenant_access_denied` | Nothing |
+| Principal inactive or disabled | `DENY / PRINCIPAL_INACTIVE` | 403 | `forbidden` | Nothing about tenants or principal state beyond "not permitted" |
+| Known permission of the other context kind | `DENY / CONTEXT_KIND_MISMATCH` | 403 | `forbidden` | That the action is not permitted |
+| Mandatory constraint failed on a visible resource | `DENY / CONSTRAINT_FAILED` | 403 | `forbidden` | That the action is not permitted |
 | Resource absent, or in another tenant | not found | 404 | `not_found` | Nothing |
 | Resource exists in the tenant, principal lacks visibility | `DENY` or `NOT_APPLICABLE` | 404 | `not_found` | Nothing; byte-identical to the previous row apart from `correlationId` |
 | Visible resource, action not permitted | `DENY` or `NOT_APPLICABLE` | 403 | `forbidden` | That the action is not permitted |
@@ -1286,12 +1347,15 @@ Rule for tenant selection: the tenant hint is the caller's own assertion about w
 | Create, parent visible but action not permitted | `DENY` | 403 | `forbidden` | That the action is not permitted |
 | `INDETERMINATE` (dependency failure) | `INDETERMINATE` | 503 with `Retry-After` | `authorization_unavailable` | "Temporarily unavailable"; retry allowed |
 | `INDETERMINATE` (defect, invalid plan, unknown permission) | `INDETERMINATE` | 500 | `internal_error` | Generic error and correlation ID |
+| Mandatory obligation the PEP cannot enforce | `OBLIGATION_UNSUPPORTED` | 500 | `internal_error` | Generic error and correlation ID; alert |
+| Class A audit outbox write fails, so the operation is rolled back (section 15, row 8a) | not an evaluation result | 500 | `internal_error` | Generic error and correlation ID; nothing was committed |
+| Repeated `tenant_access_denied` throttled (12.4) | not evaluated | 429 with `Retry-After` | `rate_limited` | That the caller is sending too many requests |
 | Mandatory step-up obligation unmet | `ALLOW` with a mandatory obligation, unmet | Challenge as defined by the API contract (401 or 403, one choice per API) | `step_up_required` | That stronger authentication is needed |
 
 Rules:
 
 - Use the same mapping on equivalent endpoints (API, export, bulk, async job results).
-- Response bodies, error codes, headers, and timing must not distinguish "not found" from "not visible", and must not distinguish the four tenant sub-cases.
+- Response bodies, error codes, and headers must not distinguish "not found" from "not visible", and must not distinguish the four tenant sub-cases. Timing is not made constant (12.4), but no branch may add deliberately distinguishing work; where a PDP call happens on one path it should also happen (or be simulated) on the other.
 - Never return role catalogs, policy expressions, other principals' permissions, or reason codes to clients. Detailed reasons live in access-controlled logs.
 - An `INDETERMINATE` outcome is never reported as 403 or 404.
 - HTTP codes are not a substitute for server-side authorization.
@@ -1315,6 +1379,7 @@ Every error body has the same shape. The `message` is a fixed text per code; it 
 | `forbidden` | You do not have permission to perform this action. | None |
 | `not_found` | The requested resource was not found. | None |
 | `authorization_unavailable` | Authorization is temporarily unavailable. Retry later. | `Retry-After` header |
+| `rate_limited` | Too many requests. Retry later. | `Retry-After` header |
 | `internal_error` | An internal error occurred. | None |
 | `step_up_required` | Additional authentication is required. | Challenge as defined by the API contract |
 
@@ -1322,9 +1387,9 @@ Protection against tenant enumeration:
 
 - Same status, error code, message, and header set for the four tenant sub-cases. Response headers must not echo the tenant hint, and the body never contains the tenant id.
 - One membership lookup (10.3); no extra query or distinct code path on any sub-case. Timing is not made constant, but no branch performs additional distinguishing work.
-- Rate-limit repeated `tenant_access_denied` per principal and per source address to slow probing.
+- Rate-limit repeated `tenant_access_denied` per principal and per source address to slow probing. Apply the same limit to the whole tenant-selection path so the throttled response (429 `rate_limited`) does not depend on which of the four sub-cases would have occurred.
 - The real cause (`NOT_A_MEMBER` or `TENANT_SUSPENDED`) is recorded only in the internal class B audit event.
-- A membership removed during a session takes effect on the next request (the token carries no tenant authority). Long-lived connections bound to a tenant must re-check membership on each message or be closed on the invalidation event (section 23).
+- A membership removed during a session is honored for at most the staleness bound of 23.0 (60 s in normal operation) because the decision cache may serve it; paths that must take effect on the next request (tenant selection, `HIGH`-risk permissions) read the membership uncached, while the token itself carries no tenant authority. Long-lived connections bound to a tenant must re-check membership on each message or be closed on the invalidation event (section 23).
 
 Distinguishing `tenant_access_denied` from `forbidden`: both are 403, but the first means "you may not act in that tenant at all" and the second means "you may act there but not do this". This reveals nothing about tenants the caller does not know, because the first code is identical for tenants that do not exist.
 
@@ -1337,16 +1402,17 @@ Distinguishing `tenant_access_denied` from `forbidden`: both are 403, but the fi
 - `check(request) -> Decision` for single resources.
 - `resolveDataScope(request) -> DataScopeDecision` for list, search, export.
 - `filterQuery(query, plan, tenantPredicate, userFilter)` in the trusted data-access layer.
-- `authorizeBulk(request, ids)` for batch operations (13.5).
+- `authorizeBulk(request, ids)` for batch operations (13.6).
 
 ```typescript
 type DataScopeDecision = {
   effect: "ALLOW" | "DENY";
   reasonCode: ReasonCode;
   evaluationFailed: boolean;
-  filterPlan?: FilterPlan;        // present iff effect = ALLOW
+  filterPlan?: AuthzPlan;         // present iff effect = ALLOW; AuthzPlan is defined below
   obligations: Obligation[];
   policyVersion: string;
+  correlationId: string;
 };
 ```
 
@@ -1479,8 +1545,8 @@ Never accept SQL fragments, functions, raw expressions, operator text, or column
 
 | Origin | Validated | Failure | HTTP | Code |
 |---|---|---|---|---|
-| User filter (query string or body) | At the API boundary against `usableInUserFilter`, and again in the data-access layer | Client error | 400 | `invalid_filter`, with `details` naming only the client's own fields |
-| Authorization plan from the PDP | In the data-access layer against `usableInAuthzPlan`, before translation | Server defect: result is `INDETERMINATE`, no query is issued | 500 | `internal_error`, with an alert |
+| User filter (query string or body) | At the API boundary against fields with `user: true`, and again in the data-access layer | Client error at the boundary: 400 `invalid_filter`, with `details` naming only the client's own fields. A filter that passed the boundary but fails the second validation is a server defect | 400 at the boundary; 500 on the second validation | `invalid_filter`; `internal_error` with an alert |
+| Authorization plan from the PDP | In the data-access layer against fields with `authz: true`, before translation | Server defect: result is `INDETERMINATE`, no query is issued | 500 | `internal_error`, with an alert |
 | Final composition | In the data-access layer | Tenant predicate missing: the layer refuses to run the query | 500 | `internal_error`, with an alert |
 
 #### Semantics
@@ -1501,7 +1567,7 @@ tenantPredicate AND authzFilterPlan AND userFilter
 
 - `tenantPredicate` is injected by the data-access layer from `TrustedContext.tenantId` for every query on a tenant-owned table, **independently of the `FilterPlan`**. A plan cannot remove or override it. The data layer refuses to run a query on a tenant-owned table that lacks it (T-P12).
 - `authzFilterPlan` comes from `resolveDataScope`.
-- `userFilter` is validated against `usableInUserFilter` fields and operators; it can only narrow the result.
+- `userFilter` is validated against the fields with `user: true` and their operators; it can only narrow the result.
 - If a mandatory security predicate cannot be produced or applied, return nothing and fail per section 15. Never fall back to an unfiltered query.
 
 ### 13.4 Pagination, sorting, aggregation
@@ -1520,12 +1586,15 @@ Maya holds `editor` at `TEAM team-17` and `TEAM team-22` in tenant X and request
 ```json
 {
   "effect": "ALLOW",
+  "reasonCode": "ALLOW_GRANT",
+  "evaluationFailed": false,
   "filterPlan": {
     "kind": "PREDICATE",
     "predicate": { "field": "team_id", "operator": "IN", "values": ["team-17", "team-22"] }
   },
   "obligations": [],
-  "policyVersion": "2026.10.1"
+  "policyVersion": "2026.10.1",
+  "correlationId": "c-7f20"
 }
 ```
 
@@ -1542,7 +1611,7 @@ LIMIT $4;
 -- $1 = 'X', $2 = ['team-17','team-22'], $3 = 'ACTIVE', $4 = 50
 ```
 
-If the plan were `FALSE`, the response is an empty page and no query is needed. If the user supplies `tenant_id` in a filter, it is rejected (not in `usableInUserFilter`) and the tenant predicate is unchanged.
+If the plan were `FALSE`, the response is an empty page and no query is needed. If the user supplies `tenant_id` in a filter, it is rejected (not a `user: true` field) and the tenant predicate is unchanged.
 
 ### 13.6 Bulk operations (Assumption A9)
 
@@ -1584,6 +1653,10 @@ POST /documents:bulk-archive
 
 `NOT_FOUND` is also what a cross-tenant or invisible ID returns; `FAILED` means the item could not be evaluated or processed and may be retried.
 
+Bulk is a deliberate, documented exception to the visible-but-unpermitted `403 forbidden` row of 12.3: the batch is authorized from one set-based plan, which does not separate visibility from the action, so every item outside the authorized set is reported as `NOT_FOUND`. An endpoint that needs the 403 distinction must evaluate visibility with the read-level plan separately.
+
+The plan carries only predicates. Per-instance mandatory constraints (SoD, relationship checks, constraints that cannot be written as predicates, step-up and other obligations) are evaluated per item or per batch before processing, as stated in 11.3 step D5; they are never skipped because the plan allowed the item.
+
 ---
 
 ## 14. Obligations [Optional]
@@ -1597,7 +1670,7 @@ type ObligationBase = { mandatory: boolean };
 
 type Obligation = ObligationBase & (
   | { type: "ALLOWED_FIELDS"; fields: string[] }           // whitelist of fields that may be returned
-  | { type: "REQUIRE_STEP_UP_AUTH"; maxAgeSeconds: number }
+  | { type: "REQUIRE_STEP_UP_AUTH"; minAssurance: AssuranceLevel; maxAgeSeconds: number }
   | { type: "REQUIRE_JUSTIFICATION" }
   | { type: "WATERMARK_EXPORT" }
 );
@@ -1609,7 +1682,7 @@ type Obligation = ObligationBase & (
 
 | Obligation | Enforced by | When |
 |---|---|---|
-| `REQUIRE_STEP_UP_AUTH` | PEP | Before any data access; compare `authentication.assuranceLevel` and `authenticatedAt` with `maxAgeSeconds` |
+| `REQUIRE_STEP_UP_AUTH` | PEP | Before any data access; compare `authentication.assuranceLevel` with `minAssurance` and `authenticatedAt` with `maxAgeSeconds` |
 | `REQUIRE_JUSTIFICATION` | PEP / service | Before data access or mutation; recorded in audit |
 | `ALLOWED_FIELDS` | Data-access layer (projection) and serializer (second line of defense) | At query projection and at serialization, so excluded fields are never fetched where avoidable |
 | `WATERMARK_EXPORT` | Export service | At export generation |
@@ -1619,8 +1692,8 @@ type Obligation = ObligationBase & (
 - Mandatory obligation the PEP cannot enforce: refuse (`OBLIGATION_UNSUPPORTED`); the action does not execute and no data is returned. Never ignore it and return `ALLOW`.
 - Advisory obligation the PEP does not recognize: proceed, and increment a metric.
 - Sending an obligation to the client is not enforcement.
-- **Merge rules** when several policies contribute: `ALLOWED_FIELDS` -> intersection of field lists; `REQUIRE_STEP_UP_AUTH` -> the smallest `maxAgeSeconds`; `REQUIRE_JUSTIFICATION` and `WATERMARK_EXPORT` -> present if any contributor requires them; if the merge is impossible (for example an empty intersection that makes the response meaningless) the PEP refuses.
-- **No leakage:** a field excluded by `ALLOWED_FIELDS` must be absent from every response path: normal responses, error bodies, search snippets and highlights, exports, response caches, webhooks, and audit payloads.
+- **Merge rules** when several policies contribute: `ALLOWED_FIELDS` -> intersection of field lists; `REQUIRE_STEP_UP_AUTH` -> the strictest `minAssurance` and the smallest `maxAgeSeconds`; the merged `mandatory` flag is true if any contributor is mandatory; `REQUIRE_JUSTIFICATION` and `WATERMARK_EXPORT` -> present if any contributor requires them; if the merge is impossible (for example an empty intersection that makes the response meaningless) the PEP refuses.
+- **No leakage:** a field excluded by `ALLOWED_FIELDS` must be absent from every response path: normal responses, error bodies, search snippets and highlights, exports, response caches, webhooks, and audit payloads. User filters, sorts, aggregates, and facets may use only fields that `ALLOWED_FIELDS` permits, so an excluded field cannot be inferred from result order, counts, or filtering.
 - Obligations that depend on deciding which rows are visible do not replace row filtering.
 
 ---
@@ -1631,13 +1704,13 @@ General rules: no authorization data failure ever produces an allow; telemetry f
 
 | # | Dependency / failure | Effect on evaluation | Required behavior | Request continues? | Cache usable? | Audit / telemetry | Retry / recovery |
 |---|---|---|---|---|---|---|---|
-| 1 | PDP or remote policy engine unavailable | No decision | Refuse; 503. The service and database are not called | No | No cached *allow*; extension in 23.3 only | Class B event, alert on rate | One bounded retry for the decision call; circuit breaker; auto-recover |
+| 1 | PDP or remote policy engine unavailable | No decision | Refuse; 503. The service and database are not called | No | No cached *allow* beyond the staleness bounds (23.1); extension in 23.3 only | Class B event, alert on rate | One bounded retry for the decision call; circuit breaker; auto-recover |
 | 2 | Policy store or bundle unreadable | PDP cannot load rules | If a validated bundle is already loaded, keep using it within the policy-staleness bound (23.1). With no valid bundle (startup), PDP is not ready: refuse all | Only with loaded valid bundle | Not applicable | Alert; log bundle version in use | Retry fetch with backoff; rollback to last validated version |
-| 3 | Authorization database (assignments, roles, permissions) unavailable | Cannot determine grants | `INDETERMINATE`; 503 | No | Cache may be read only within staleness bounds (23.1); expired entries are misses | Class B event; alert | Recover when DB returns; no manual allow |
+| 3 | Authorization database (assignments, roles, permissions) unavailable | Cannot determine grants | `INDETERMINATE`; 503 | No on a cache miss | A cache hit within the staleness bounds (23.1) is ordinary operation and is served, so the request continues; a miss or an expired entry cannot be refilled and is refused | Class B event; alert | Recover when DB returns; no manual allow |
 | 4 | Membership / relationship service unavailable | Cannot verify membership or relationship | `INDETERMINATE` for operations that need it; 503. Operations that do not depend on it are unaffected | No (for dependent operations) | Same as row 3 | Class B event; alert | Backoff; recover |
 | 5 | `resolveDataScope()` fails | No plan | `DataScopeDecision` = `DENY` with `evaluationFailed`; 503. **No query is issued** | No | No | Class B event; alert | Retry the call; never build an ad hoc filter |
 | 6 | `FilterPlan` invalid or cannot be translated | Defect | `INDETERMINATE`; 500; **no query is issued** | No | No | Alert (P1: defect); correlation ID | Fix code/policy; roll back version |
-| 7 | Mandatory obligation cannot be enforced | PEP-level failure | Refuse; the action does not run; fetched data is discarded and never serialized | No | No | Class B event `OBLIGATION_UNSUPPORTED`; alert | Fix PEP or policy; rollback |
+| 7 | Mandatory obligation cannot be enforced | PEP-level failure | Refuse; 500 `internal_error`; the action does not run; fetched data is discarded and never serialized | No | No | Class B event `OBLIGATION_UNSUPPORTED`; alert | Fix PEP or policy; rollback |
 | 8a | Outbox write fails (the audit table in the data's own database cannot be written, including when the audit trigger of 22.6 cannot write) | Mandatory event cannot be recorded | Class A: the whole transaction rolls back, including a membership or assignment change whose audit trigger failed (T-U13); class C mutation: rolls back; class C read or export: no data is released. Response 500 `internal_error`. Nothing was committed | No | Not applicable | Alert; counted | The caller may retry the whole operation |
 | 8b | Downstream audit sink or relay unavailable (outbox rows already committed) | None on the decision or on the committed change | The business change **stays committed**; class C operations proceed because their event is already durable; the relay retries; class B events stay in the durable local queue; class D events are dropped and counted (loss permitted for D only) | Yes | Not applicable | Backlog age and depth metrics; alert at 5 min (warning) and 30 min (critical), A11 | Relay retries with exponential backoff and jitter; at-least-once; the sink de-duplicates by `event_id`; `PENDING` rows are never purged |
 | 8c | Class B local queue cannot accept the event (queue full or storage failure) | None on the decision | The refusal stands (the request was already refused). The event is **lost**: this is the only sanctioned loss of a class B event; `audit_events_lost_total` is incremented and an alert fires | Yes (already refused) | Not applicable | Alert; counted | Restore queue capacity; lost events cannot be recovered |
@@ -1701,7 +1774,9 @@ WHERE id = :document_id
   AND team_id = ANY(:authorized_team_ids);
 ```
 
-Always check the affected row count. Zero rows means the resource no longer satisfied the conditions; a successful statement is not proof that an update happened.
+The predicate above catches a change to the **resource** (it moved to another team). It does not catch a change to the **grant** (the assignment was revoked, or the membership removed, after the check). For `HIGH`-risk writes, also re-verify the grant in the same transaction: join the effective-grant lookup of 8.7 into the predicate (or read it with `SELECT ... FOR SHARE` before the write), or compare the principal-and-tenant authorization epoch (23.2) with the value used for the decision.
+
+Always check the affected row count. Zero rows means the resource no longer satisfied the conditions, or the grant no longer held; a successful statement is not proof that an update happened. Respond with 409 `conflict` (the state changed) and re-evaluate on retry; if the retry is denied, apply the mapping of 12.3.
 
 ### 17.2 Resource transfer between scopes [Optional]
 
@@ -1742,14 +1817,14 @@ These are separate capabilities, not part of ordinary RBAC.
 **Cross-tenant support access (Assumption A2).** Platform staff have no ambient access to tenant data. To work in a tenant they open a **support session** (`support_sessions`):
 
 - Requires a platform permission such as `platform.tenant.support_access`, an approval or justification, and a short expiry.
-- The session binds one tenant and a limited role; evaluation then runs in a `TENANT` context where the actor is the platform principal and the effective permissions are those of the session's role only.
+- The session binds one tenant, one platform principal, and a limited role. Evaluation then runs in a `TENANT` context where `principalId` and `actorId` are both the platform principal, `tenantId` is the session's tenant, and the trusted context carries `supportSessionId`. The effective permissions are those of the session's role only. A platform principal has no `tenant_memberships` row, so step B2 of 11.3 accepts, in place of an `ACTIVE` membership, an `ACTIVE` support session bound to `(tenantId, principalId)` that has not expired or been revoked, checked against `support_sessions` on every request; with no such session the result is `DENY / NOT_A_MEMBER`.
 - The UI shows the support state to the tenant's users where appropriate; sessions can be ended and revoked at any time.
 - Audit (class A for open/close, class C for actions): the real actor, the tenant, the approval reference, and the actions taken. Never replace the original actor with another user.
 - Post-use review.
 
 **Impersonation of a user** (acting as that user) is a stricter variant: time-limited, approved, visibly flagged, limited in allowed actions, and audited with both the real actor and the impersonated principal. It never bypasses tenant isolation or other invariants.
 
-**Break-glass:** time-bound, strongly authenticated, alerted, reviewed, and logged.
+**Break-glass:** time-bound, strongly authenticated, alerted, reviewed, and logged. Audit classes (22.1): activation, deactivation, and impersonation start and stop are class A; state-changing actions during any of these sessions are class C mutation; reads and exports during them are class C read or export.
 
 These may be deferred, but the ADR should treat them as distinct capabilities.
 
@@ -1823,9 +1898,9 @@ Per event class:
 
 | Class | Events | Mandatory | Created, and transaction boundary | Operation fails or rolls back if the event cannot be durably recorded | If relay or sink is unavailable | Loss permitted? (precise conditions) | Retry, idempotency, duplicates, recovery |
 |---|---|---|---|---|---|---|---|
-| A | Security-critical administrative changes: role, assignment, membership, policy, catalog, support session open/close, transfers | Yes | Inside the transaction of the change, before commit. For membership and assignment changes the **database trigger** writes it (22.6); for other class A changes the trusted service writes it in the same transaction | Yes: the whole transaction rolls back; response 500 | The change stays committed; relay retries | **No**, for a committed change through a supported path. Missing events are possible only through the cases excluded above | `event_id` is the outbox primary key (a trigger event gets `gen_random_uuid()` at creation); at-least-once relay; the sink has a unique constraint on `event_id`; `PENDING` rows are never purged; alert at 5 min / 30 min (A11) |
-| C, mutation | State-changing operations with a `HIGH`-risk permission, support or impersonation actions | Yes | As class A | As class A | As class A | As class A | As class A |
-| C, read or export | Sensitive reads and exports, step-up-gated reads | Yes (Assumption A5) | Its own short transaction on the outbox of the database that serves the read, committed **before** data is released | Yes: no data is released; response 500 | The operation proceeds (the event is already durable) | **No** for released data; the event may overstate if the release then fails | As class A |
+| A | Security-critical administrative changes: role, assignment, membership, policy, catalog, support session open/close, break-glass activation, impersonation start and stop, transfers | Yes | Inside the transaction of the change, before commit. For membership and assignment changes the **database trigger** writes it (22.6); for other class A changes the trusted service writes it in the same transaction | Yes: the whole transaction rolls back; response 500 | The change stays committed; relay retries | **No**, for a committed change through a supported path. Missing events are possible only through the cases excluded above | `event_id` is the outbox primary key (a trigger event gets `gen_random_uuid()` at creation); at-least-once relay; the sink has a unique constraint on `event_id`; `PENDING` rows are never purged; alert at 5 min / 30 min (A11) |
+| C, mutation | State-changing operations with a `HIGH`-risk permission, state-changing actions in a support, impersonation, or break-glass session | Yes | As class A | As class A | As class A | As class A | As class A |
+| C, read or export | Sensitive reads and exports, step-up-gated reads, reads and exports in a support, impersonation, or break-glass session | Yes (Assumption A5) | Its own short transaction on the outbox of the database that serves the read, committed **before** data is released | Yes: no data is released; response 500 | The operation proceeds (the event is already durable) | **No** for released data; the event may overstate if the release then fails | As class A |
 | B | Denials, evaluation failures, obligation failures | Yes | After the decision. There is no business change to persist: the action was refused. Written to a durable local queue | **No**: the refusal stands | Events stay in the local queue and are forwarded when the sink returns | **Yes, only** when the local queue itself cannot accept the write (full, storage failure): counted in `audit_events_lost_total`, alert (row 8c) | Source-generated `event_id`; the sink de-duplicates |
 | D | Routine successful reads and low-risk writes | No (configurable; sampling allowed) | At response time; not coupled to any transaction | No | Dropped or buffered; counted | **Yes, by design**: sampling, and dropping when the sink is down or the buffer is full; counted | Duplicates tolerated |
 | E | Operational diagnostics | Not audit | Telemetry pipeline | Never blocks | Never blocks | Yes | Not applicable |
@@ -1853,7 +1928,7 @@ Distinguish three streams: authorization change events, access decision events, 
 ### 22.3 Integrity and privacy
 
 - Restrict who can read, modify, and delete audit data.
-- Never log access tokens, refresh tokens, passwords, or secrets; avoid excess personal or sensitive data (including fields excluded by `ALLOWED_FIELDS`).
+- Never log access tokens, refresh tokens, passwords, or secrets; avoid excess personal or sensitive data; fields excluded by `ALLOWED_FIELDS` must not appear in audit payloads (14.3).
 - For high-assurance systems, consider append-only storage, tamper-evident controls, or an independent log system.
 - Define retention and access policy.
 
@@ -1879,12 +1954,12 @@ Authorization data (roles, assignments, memberships), business data, the policy 
 | Trusted service (with `SET LOCAL`) | Yes, attributed; the settings do not leak into the next transaction | T-U10 |
 | Direct SQL by any role that can write the tables | Yes, flagged unattributed | T-U09 |
 | Application role with no privilege on `audit_outbox`, not the owner, not a superuser | Yes (the trigger functions are `SECURITY DEFINER`). The role cannot insert, update, or delete outbox rows, cannot call `audit_emit`, cannot disable triggers, and cannot switch to replica mode | T-U11 |
-| Table owner or superuser who disables a trigger, or a superuser using `session_replication_role = replica` | **No.** Not preventable by the DDL. In replica mode the assignments are not revoked either; the stale `ACTIVE` assignment is still not effective because the membership check denies it | T-U12, T-U12b |
+| Table owner or superuser who disables a trigger, or a superuser using `session_replication_role = replica` | **No.** Not preventable by the DDL. In replica mode the assignments are not revoked either; the stale `ACTIVE` assignment is still not effective because the membership check denies it, and reinstating that membership is refused while any `ACTIVE` assignment remains (8.3) | T-U12, T-U12b |
 | `TRUNCATE` and schema changes | Not captured by row triggers. Revoke `TRUNCATE` from application roles; schema changes are governed by change control | Not tested |
 
 **Required controls.** The application role is not the table owner and not a superuser; only a small, audited set of administrators can disable triggers; `audit_outbox` is writable only through `audit_emit`; the migration role is separate from the runtime role. These are deployment controls; the DDL demonstrates the restricted-role case only.
 
-**Reconciliation (proposed, not implemented as a job).** Purpose: detect the cases the database cannot prevent, that is a privileged bypass. Detection scope: (1) memberships that are `REMOVED` but have no `REMOVED` event; (2) `ACTIVE` assignments whose membership is `REMOVED`. The two reference queries were executed in the sandbox and flagged exactly the seeded bypass cases (T-U12, T-U12b). Recovery: no automatic repair; raise an alert; a human revokes the stale assignments as in 8.6 and writes a compensating audit event marked as reconciled. Verification requirement: run the queries against seeded bypass cases in the product environment. The scheduled job, its interval, its alert routing, and its access to events after the outbox retention window (it must then read the sink) are **not implemented** and are not a proof that the gap is closed.
+**Reconciliation (proposed, not implemented as a job).** Purpose: detect the cases the database cannot prevent, that is a privileged bypass. Detection scope: (1) memberships that are `REMOVED` but have no `REMOVED` event; (2) `ACTIVE` assignments whose membership is `REMOVED`; (3) assignment rows with no `created` event, or whose current values differ from the last recorded event (a bypass that inserted or altered assignments); (4) memberships whose status differs from the last recorded event. Checks (3) and (4) are proposed and have no reference query yet; changes to `role_permissions` and the catalog are covered only by the trusted service's class A events and are out of this job's scope. The two reference queries were executed in the sandbox and flagged exactly the seeded bypass cases (T-U12, T-U12b). Recovery: no automatic repair; raise an alert; a human revokes the stale assignments as in 8.6 and writes a compensating audit event marked as reconciled. Verification requirement: run the queries against seeded bypass cases in the product environment. The scheduled job, its interval, its alert routing, and its access to events after the outbox retention window (it must then read the sink) are **not implemented** and are not a proof that the gap is closed.
 
 **Limitations.** Events for changes outside the three tables, and for changes made by a privileged bypass, are not guaranteed. The outbox storage itself can be lost or altered by a privileged user (22.3).
 
@@ -1911,6 +1986,7 @@ Defaults below are **assumptions** to confirm against business risk; the trade-o
 | Role assignments | `tenant_role_assignments`, `platform_role_assignments` | Event-driven invalidation by tenant and principal; TTL as backstop | 60 s | Entry expires; read source; if source down, deny (row 3) | Only within 60 s | T-V01 |
 | Role-permission mappings | `role_permissions` | Event-driven on admin change; TTL | 300 s (immediate invalidation on event) | As above | Only within bound | T-V03 |
 | Tenant memberships | `tenant_memberships` | Event-driven on every status change (suspend, reinstate, remove); TTL | 60 s | Deny for dependent operations | Only within 60 s | T-V02 |
+| Principal status and tenant status | `principals.status`, `tenants.status` | Event-driven on every status change (disable, suspend, reinstate); the change also bumps the authorization epoch of 23.2; TTL | 60 s | Deny for dependent operations | Only within 60 s | T-V02 |
 | Resource relationships | `resource_relationships` or domain tables | Event-driven; TTL | 60 s (realtime for sharing-sensitive resources) | Deny for dependent operations | Only within bound | T-V02 |
 | Direct grants / explicit denies (if used) | Their tables | Event-driven with priority for denies | 60 s | As assignments | Only within bound | T-V01 |
 | Delegation / support sessions | `delegation_records`, `support_sessions` | Event-driven; bounded by token and session expiry | 60 s | Deny | Never beyond session expiry | T-V01 |
@@ -1922,7 +1998,7 @@ Do not apply one TTL to all data: risk differs. If no business requirement fixes
 
 ### 23.2 Cache keys
 
-A key must include every dimension that influences the result: `contextKind`, `tenantId`, `principalId` (and `actorId`/`representedPrincipalId` if present), `action`, resource id or scope attributes, the principal-and-tenant authorization epoch (a counter bumped on any change affecting them), `policyVersion`, and any assurance level the decision depends on. Never key on `user_id + action` alone. Never cache `INDETERMINATE` or an error as an allow, and avoid caching decisions that depend on fast-changing attributes without invalidation.
+A key must include every dimension that influences the result: `contextKind`, `tenantId`, `principalId` (and `actorId`/`representedPrincipalId` if present), `action`, resource id or scope attributes, the principal-and-tenant authorization epoch (a counter bumped on any change affecting them), `policyVersion`, and any assurance level the decision depends on. Never key on `user_id + action` alone. Never cache an `INDETERMINATE` result or an error, neither as an allow nor as a deny (section 15, row 10), and avoid caching decisions that depend on fast-changing attributes without invalidation.
 
 ### 23.3 Cached-decision grace during dependency failure [Optional, disabled by default]
 
@@ -1945,7 +2021,7 @@ A key must include every dimension that influences the result: `contextKind`, `t
 - Support and impersonation sessions: their authority is time-bound by design.
 - Step-up-gated operations and requests involving delegation: their assurance cannot be reconstructed from a cached decision.
 
-**Entry requirements.** The entry was created while dependencies were healthy and within the normal staleness bound at creation; it carries its `policyVersion` and authorization epoch; its absolute age since creation is at most the grace limit (300 s). Any invalidation event received (membership removal, assignment revocation, role-permission change, policy version change) purges the entry, so grace never serves a decision for a principal or tenant with a known revocation. Revocation semantics are therefore: normally effective within the SLA; during grace, bounded by the grace limit.
+**Entry requirements.** The entry was created from authorization data read while dependencies were healthy; it carries its `policyVersion` and authorization epoch; its age, measured from the moment that data was read (not from the moment the entry was stored), is at most the grace limit (300 s). Measured this way the worst-case revocation latency during grace is 300 s, as published. Any invalidation event received (membership removal, assignment revocation, role-permission change, policy version change) purges the entry, so grace never serves a decision for a principal or tenant with a known revocation. Revocation semantics are therefore: normally effective within the SLA; during grace, bounded by the grace limit.
 
 **Residual risk.** If the invalidation channel is down at the same time, revocations are not seen and the worst case is the grace limit.
 
@@ -2178,9 +2254,9 @@ Rows marked `RI/PS` ran in the sandbox against **reference artifacts** (the refe
 | T-V06 | Mixed policy versions during rollout | Decisions labelled with version; no cross-version cache hits | P1-8 | S/NR |
 | T-V07 | `HIGH`-risk permission | Source of truth read per request | P1-8 | S/NR |
 | T-V08 | Cache hit within the TTL | Served from the cache with no source read; the result equals the source's | P2-2† | S/NR |
-| T-V09 | Revoke an assignment, remove a membership, change a role-permission mapping (grace disabled) | Invalidation events purge the entries; access is denied within 60 s | P2-2† | S/NR |
+| T-V09 | Revoke an assignment, remove a membership, change a role-permission mapping (grace disabled) | Invalidation events purge the entries; access is denied within 60 s for assignments and memberships, and within 300 s at most for role-permission mappings (purged on the event) | P2-2† | S/NR |
 | T-V10 | An authorization dependency is unavailable, grace disabled | `503 authorization_unavailable`; no cached allow is served | P2-2† | S/NR |
-| T-V11 | Dependency unavailable, grace enabled, an eligible read (`LOW` risk, `TENANT` context) | Served from an entry created while healthy and younger than 300 s; audit flag `served_from_grace`; metric and alert | P2-2† | S/NR |
+| T-V11 | Dependency unavailable, grace enabled, an eligible read (`LOW` risk, `TENANT` context) | Served only after the dependency breaker has been open for 10 s (A12), from an entry created while healthy and younger than 300 s; audit flag `served_from_grace`; metric and alert | P2-2† | S/NR |
 | T-V12 | Grace enabled; a write, an export, a `HIGH`-risk permission, `PLATFORM` context, a delegated request, a support session | Never served from grace; `503` | P2-2† | S/NR |
 | T-V13 | A revocation event is received during grace | The entry is purged; the request is denied or `503`; never served | P2-2† | S/NR |
 | T-V14 | Measure revocation latency in normal operation and in a declared outage with grace enabled | At most 60 s normally and at most 300 s in the outage; both match the published SLA statement | P2-2† | S/NR |
@@ -2201,7 +2277,7 @@ Rows marked `RI/PS` ran in the sandbox against **reference artifacts** (the refe
 
 ### 24.13 Transfer and audit
 
-*Verified by:* database and relay tests for T-U01, T-U02, T-U06; API-level tests for transfers and class C.
+*Verified by:* database and relay tests for T-U01, T-U02, T-U06, T-U09 to T-U15 (reference implementation, sandbox); T-U18 (database, added after the sandbox run, not yet executed); API-level tests for transfers and class C.
 
 | ID | Scenario | Expected | Finding | Status |
 |---|---|---|---|---|
@@ -2227,6 +2303,7 @@ Rows marked `RI/PS` ran in the sandbox against **reference artifacts** (the refe
 | T-U14 | Relay or sink outage after the trigger-written events are durably persisted | The removal stays committed; events stay `PENDING`; attempts are counted | P1-2‡ | RI/PS |
 | T-U15 | Recovery plus duplicate delivery of trigger-written events | Every event is in the sink exactly once; none is `PENDING` | P1-2‡ | RI/PS |
 | T-U16 | Loss semantics: class B local queue cannot accept an event; class D event dropped | Class B: lost, counted, alert, refusal stands. Class D: dropped by design, counted | P1-2‡ | S/NR |
+| T-U18 | UPDATE an assignment's `valid_until`, scope, role, principal, or `approval_reference` (direct SQL and service) | A class A `*.modified` event with old and new values in the same transaction | - | S/NR |
 | T-U17 | Scheduled reconciliation job in the product (interval, alert routing, access to the sink after outbox retention) | Seeded bypass cases are detected and alerted | P1-2‡ | S/NR |
 
 ### 24.14 Carried over from v1.2 (updated)
@@ -2248,7 +2325,7 @@ Rows marked `RI/PS` ran in the sandbox against **reference artifacts** (the refe
 
 ### 24.15 Role ownership, membership lifecycle, catalog naming, and migration
 
-*Verified by:* database integration tests (T-RO, T-M, T-N01, T-MIG) and unit or lint tests (T-RO08, T-N02 to T-N06).
+*Verified by:* database integration tests (T-RO01 to T-RO07, T-RO09 to T-RO11, T-M01 to T-M03, T-M05, T-M06, T-M08 to T-M17, T-N01, T-MIG; T-RO12 by the document check); PDP and product tests (T-M04, T-M07, T-M18, T-M19 to T-M21); database tests added after the sandbox run and not yet executed (T-M22 to T-M24); unit or lint tests (T-RO08, T-N02 to T-N06).
 
 | ID | Scenario | Expected | Finding | Status |
 |---|---|---|---|---|
@@ -2282,6 +2359,12 @@ Rows marked `RI/PS` ran in the sandbox against **reference artifacts** (the refe
 | T-M16 | Unrelated update of a removed membership | `ended_at` unchanged | P2-2‡ | RI/PS |
 | T-M17 | Reinstatement, then removal again | Reinstatement clears `ended_at`; the later removal sets a later `ended_at` | P2-2‡ | RI/PS |
 | T-M18 | Product: every real authorization path (API single, list, bulk, background job, export) for `SUSPENDED` and `REMOVED` members | Every path denies; a job enqueued earlier is refused when it runs | P1-1‡ | S/NR |
+| T-M19 | Actor holding `role.manage` adds to a custom role a permission the actor does not hold | Rejected (7.8) | - | S/NR |
+| T-M20 | Granter assigns a role containing a permission it does not hold, or at a scope its own grants do not cover | Rejected (7.8) | - | S/NR |
+| T-M21 | Principal assigns a role to itself, with and without a second approver in `approval_reference` | Rejected without; accepted with a different approver recorded (7.8) | - | S/NR |
+| T-M22 | UPDATE an `ACTIVE` assignment so that `principal_id` or `tenant_id` points to a `SUSPENDED` or `REMOVED` membership, or to a principal with no membership | Rejected by the assignment trigger (R1, R4) | - | S/NR |
+| T-M23 | Set a `REVOKED` row of `platform_role_assignments` back to `ACTIVE`; change its `principal_id` or `role_id` | Each rejected by `platform_assignment_integrity` | - | S/NR |
+| T-M24 | Reinstate a `REMOVED` membership while an `ACTIVE` assignment remains (created by a bypass), then revoke it and retry | Refused first; accepted after revocation, and the old assignment stays `REVOKED` | - | S/NR |
 | T-N01 | A `platform.` key with `TENANT` context; a key without the prefix with `PLATFORM` context | Both rejected by `permissions_context_prefix_ck` | P2-3† | RI/PS |
 | T-N02 | Catalog lint over all keys | Fails on grammar, prefix rule, or missing context kind | P2-3† | S/NR |
 | T-N03 | `check` with an action not in the catalog | `INDETERMINATE / UNKNOWN_PERMISSION`; `500 internal_error`; alert | P2-3† | S/NR |
@@ -2432,10 +2515,10 @@ Domain: a neutral document service. Resource `document` has `tenant_id`, `compan
 
 ```json
 {
-  "event_id": "e-0193", "class": "B", "correlationId": "c-7f22",
-  "tenantId": "X", "actorId": "maya", "action": "document.update",
+  "event_id": "e-0193", "event_class": "B", "correlation_id": "c-7f22",
+  "tenant_id": "X", "actor_id": "maya", "action": "document.update",
   "resource": { "type": "document", "id": "doc-9" },
-  "state": "DENY", "reasonCode": "OUT_OF_SCOPE", "policyVersion": "2026.10.1"
+  "state": "DENY", "reason_code": "OUT_OF_SCOPE", "policy_version": "2026.10.1"
 }
 ```
 
@@ -2475,9 +2558,9 @@ Mapping of permission, assignment scope, resource scope, and data scope:
 
 | Principal | Assignment | Allowed actions | Data scope for `document.read` |
 |---|---|---|---|
-| Maya | `editor` @ `TEAM team-17`, `TEAM team-22` | read, create, update | `tenant = X AND team_id IN (team-17, team-22)` |
-| Omar | `viewer` @ `TENANT` | read | `tenant = X` |
-| Priya | `editor` @ `COMPANY company-a` | read, create, update | `tenant = X AND company_id = company-a` |
+| Maya | `editor` @ `TEAM team-17`, `TEAM team-22` | read, create, update | `tenant_id = X AND team_id IN (team-17, team-22)` |
+| Omar | `viewer` @ `TENANT` | read | `tenant_id = X` |
+| Priya | `editor` @ `COMPANY company-a` | read, create, update | `tenant_id = X AND company_id = company-a` |
 
 The permission says which action is allowed; the data scope says which records. Holding `document.update` does not imply access to every document.
 
@@ -2565,7 +2648,7 @@ Record decisions for:
 
 ## 30. Decision status table
 
-Status: **decided** (this document fixes it), **recommended** (default; confirm), **optional**, **unresolved** (needs business input).
+Status: **decided** (this document fixes it), **recommended** (default; confirm), **optional**, **unresolved** (needs business input). A status may carry a qualifier after a comma or semicolon, such as "pending human confirmation", or a reference to an assumption or decision id.
 
 | Topic | Status | Choice | Reason | Trade-off | Sections | Open question | Condition to change |
 |---|---|---|---|---|---|---|---|
@@ -2583,7 +2666,7 @@ Status: **decided** (this document fixes it), **recommended** (default; confirm)
 | Direct grants | optional | Option A (role-only) | Easier to govern | Less flexible | 7.6 | - | Concrete need |
 | RLS | optional | Defense in depth | Extra containment | Operational complexity | 20 | - | Regulatory isolation needs |
 | Role ownership (D2) | decided | Explicit `is_system_defined`; immutable ownership fields; DB checks and trigger | No ownership inferred from `tenant_id IS NULL` | Promoting a role needs a new role | 8.2.1 | - | A product need to re-home roles |
-| Membership lifecycle (D3) | decided (clarified in v1.4.1) | Stored assignment state is separate from effective authorization. Suspension preserves stored assignments but they grant nothing; reinstatement makes still-valid ones effective again; removal revokes in the same transaction and is never silently restored | No silent restoration of authority after removal; suspension stays reversible | Stale `ACTIVE` rows exist during suspension and rely on the membership check on every path | 8.5 | - | A requirement that suspension also revokes |
+| Membership lifecycle (D3) | decided, pending human confirmation (A14; clarified in v1.4.1) | Stored assignment state is separate from effective authorization. Suspension preserves stored assignments but they grant nothing; reinstatement makes still-valid ones effective again; removal revokes in the same transaction and is never silently restored | No silent restoration of authority after removal; suspension stays reversible | Stale `ACTIVE` rows exist during suspension and rely on the membership check on every path | 8.5 | - | A requirement that suspension also revokes |
 | `FilterPlan` `IN` scope (D5) | decided | `IN` only for `ID`, `STRING`, `ENUM`, `NUMBER`; none for `BOOLEAN` or `TIMESTAMP` | One typed array per kind, no useless operators | Cannot express `IN` over booleans or instants | 13.2 | - | A concrete use case |
 | Permission context namespace (D6) | decided | `platform.` prefix for every `PLATFORM` permission | Context is visible in code, policy, and logs | Renames from v1.3 keys | 6.1, 6.4 | - | A different naming convention in an existing catalog |
 | Tenant-selection failure response (A13) | recommended | `403 tenant_access_denied`, identical for every sub-case | No tenant enumeration | Differs from the 404 used for resources | 12.3, 12.4 | Whether product prefers 404 | API conventions |
@@ -2595,17 +2678,18 @@ Status: **decided** (this document fixes it), **recommended** (default; confirm)
 
 ## 31. References
 
-Verify each link before publishing; URLs and page structure may have changed.
+Verify each link before publishing; URLs and page structure may have changed. When this revision was checked, the OWASP 2023 page, RFC 7643, the Zanzibar page, and the OPA documentation root resolved; the OPA data-filtering, NIST, OpenFGA, and SpiceDB URLs could not be fetched from the checking environment and remain unverified.
 
 - NIST SP 800-162, *Guide to Attribute Based Access Control (ABAC) Definition and Considerations*: https://csrc.nist.gov/pubs/sp/800/162/upd2/final
 - OWASP Authorization Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html
-- OWASP API Security Top 10: https://owasp.org/API-Security/
+- OWASP API Security Top 10, 2023 edition: https://owasp.org/API-Security/editions/2023/en/0x11-t10/
 - Open Policy Agent documentation: https://www.openpolicyagent.org/docs
 - Open Policy Agent, data filtering: https://www.openpolicyagent.org/docs/filtering
 - PostgreSQL Row Security Policies: https://www.postgresql.org/docs/current/ddl-rowsecurity.html
 - PostgreSQL `CREATE POLICY`: https://www.postgresql.org/docs/current/sql-createpolicy.html
 - PostgreSQL `CREATE INDEX` (including `NULLS NOT DISTINCT`): https://www.postgresql.org/docs/current/sql-createindex.html
 - Google Research, *Zanzibar: Google's Consistent, Global Authorization System*: https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/
+- RFC 7643, *System for Cross-domain Identity Management: Core Schema*: https://www.rfc-editor.org/rfc/rfc7643
 - RFC 7644, *System for Cross-domain Identity Management (SCIM) Protocol*: https://www.rfc-editor.org/rfc/rfc7644
 - OpenFGA documentation: https://openfga.dev/docs
 - SpiceDB documentation: https://authzed.com/docs
@@ -2615,6 +2699,19 @@ Verify each link before publishing; URLs and page structure may have changed.
 ---
 
 ## Appendix A. Change logs
+
+### A.0 Corrections applied after the v1.4.1 review (same version number)
+
+A later review of this document found inconsistencies and gaps; they were corrected in place without a new version number. **These corrections have not been executed.** The companion files (`authz_v1_4_1_reference.sql`, the seed file, the test harness, `doc_consistency_check.py`) and the sandbox results of Appendix D describe the DDL and document **before** these corrections. Before relying on the evidence of Appendix D, regenerate the companion SQL from section 8.3 and rerun the harness and the document check.
+
+| Area | Sections | What changed |
+|---|---|---|
+| DDL | 8.2, 8.3, 8.5.2, 22.6 | `scope_id` non-empty `CHECK`; membership check also when an `ACTIVE` assignment is re-pointed to another principal or tenant; no-reactivation and immutability trigger for `platform_role_assignments`; audit event for changes to any security-relevant assignment column; cascade revocation records `revoked_by`; reinstatement refused while an `ACTIVE` assignment remains; seed key `authz.deny.manage` now has `resource_type = 'authz.deny'`; privilege model comment for separate role-admin and platform-admin roles; `app.actor_id` documented as asserted |
+| New rule | 7.8, 6.4, tests T-M19 to T-M24, T-U18 | Baseline rule that role definition and assignment stay within the actor's own authority; no self-grant |
+| Decision algorithm | 10.2, 11.1 to 11.3, 12.3, 12.4, 14, 15, 17.1, 19 | Absent membership is a defined value; types use `AuthzPlan`; Phase A steps renamed PA1 to PA4; collection constraints pushed into the plan; support sessions replace membership in step B2; new HTTP rows and `rate_limited`; `REQUIRE_STEP_UP_AUTH` gains `minAssurance` and a merge rule for `mandatory`; bulk documented as the not-found exception; grant re-check in the write transaction |
+| Cache and audit | 22.1, 22.3, 22.6, 23.1 to 23.3 | Staleness rows for principal and tenant status; grace age measured from the data read time; `INDETERMINATE` never cached; break-glass and impersonation event classes; wider reconciliation scope |
+| Evidence text | 24.13, 24.15, 30, Appendix D | D.2 reconciled (140 IDs = 134 harness tests + 6 document-check IDs); executed-test lists no longer include rows that are specified only (T-P08, T-P16, T-P17, T-RO08, T-M04, T-M07); D.3 counts: `S/NR` rows 148 (was 141) because T-M19 to T-M24 and T-U18 were added; first-person wording removed; D3 status aligned with Appendix C |
+| Other | Front matter, 24.0, 31 | "v1.4" labels changed to "v1.4.1"; OWASP edition pinned; RFC 7643 added; unverified URLs noted |
 
 ### A.1 v1.4 to v1.4.1
 
@@ -2653,7 +2750,7 @@ Findings come from the review of v1.3. "Why" gives the reason for each change.
 Additional changes found during the regression review (not in the review prompt):
 
 - The tenant `status` (`SUSPENDED`) was never checked by the algorithm. Step B2 now checks it, with reason `TENANT_SUSPENDED`, mapped to the same 403 as no membership.
-- An action missing from the catalog was not handled. New step A4 and reason `UNKNOWN_PERMISSION` (`INDETERMINATE`, 500).
+- An action missing from the catalog was not handled. New step PA4 and reason `UNKNOWN_PERMISSION` (`INDETERMINATE`, 500).
 - The first draft of the assignment trigger blocked edits to historical revoked rows; it now rechecks the role only on insert or when `role_id` or `tenant_id` change (T-M06, section 8.6).
 - Added the reference grant lookup (8.7, T-G07) because several rules depended on it.
 - Added the tenant-context permission `tenant_membership.manage`, which the membership lifecycle needs.
@@ -2817,7 +2914,7 @@ Negative controls (the DDL was deliberately broken in a temporary copy and the s
 
 A fifth control (audit triggers dropped) aborted with an error when a later test referred to the dropped trigger, so it produced no per-test list and is not counted as evidence.
 
-What the run found: the v1.4 migration query flagged `ACTIVE` assignments of `SUSPENDED` memberships, which contradicts the lifecycle (fixed in 8.6); the audit trigger needed `SECURITY DEFINER` for a restricted role (T-U11); and two harness flaws of mine (a relay batch limit, a reused variable name) were fixed in the harness. No other DDL defect was found.
+What the run found: the v1.4 migration query flagged `ACTIVE` assignments of `SUSPENDED` memberships, which contradicts the lifecycle (fixed in 8.6); the audit trigger needed `SECURITY DEFINER` for a restricted role (T-U11); and two flaws in the test harness (a relay batch limit, a reused variable name) were fixed in the harness. No other DDL defect was found.
 
 ### D.2 Executed tests by group
 
@@ -2834,9 +2931,11 @@ What the run found: the v1.4 migration query flagged `ACTIVE` assignments of `SU
 | T-MIG | 5 | T-MIG01, T-MIG02a, T-MIG02b, T-MIG02c, T-MIG03 |
 | T-DOC | 5 | T-DOC01, T-DOC02, T-DOC03, T-DOC04, T-DOC05 |
 
+The table lists 140 IDs. Six of them are produced by `doc_consistency_check.py` (the 6 checks in D.1): T-RO12 and T-DOC01 to T-DOC05. The remaining 134 are the tests run by `authz_v1_4_1_reference_tests.py`, which is the "134 executed, 134 passed" figure used elsewhere in this document.
+
 ### D.3 Status of the catalog rows (section 24)
 
-`RI/PS` (reference-implemented, passed in the sandbox): **74** rows. `S/NR` (specified, not run): **141** rows. `PI` or `PC` (product implemented, passed in product CI): **0** rows. A row can group several executed sub-tests.
+`RI/PS` (reference-implemented, passed in the sandbox): **74** rows. `S/NR` (specified, not run): **148** rows. `PI` or `PC` (product implemented, passed in product CI): **0** rows. A row can group several executed sub-tests.
 
 Groups with no executed row: T-C, T-E, T-H, T-R, T-O, T-B, T-S, T-V, T-A, T-TR, T-Z. T-F is executed only for T-F08 and T-F14; T-U only for the audit-capture and relay tests listed in D.2.
 
@@ -2855,10 +2954,10 @@ Evidence status: **Executed (sandbox, reference)** means the reference artifact 
 | Relay or sink outage, retry, recovery, duplicate delivery | P1-2‡ | Relay and sink unique constraint | Simulated relay and sink in the harness | T-U14, T-U15, T-F14, T-U06, T-U02 | Executed against a simulation | Real relay and sink not implemented |
 | Reconciliation detects privileged bypass | P1-2‡ | Proposed scheduled job | Two reference queries in the harness | T-U12 (queries); T-U17 (job) | Queries executed; job specified only | Job, interval, alerting, sink access not implemented |
 | Loss semantics of classes B and D; class C read ordering | P1-2‡ | Local queue, PEP, service | None | T-U16, T-U07, T-F13 | Specified only | No artifact |
-| Role ownership, key naming, immutability, seed data | P2-3‡ | `CHECK`s, immutability trigger, assignment trigger | DDL; seed file | T-RO01 to T-RO11, T-M06, T-MIG01 | Executed (sandbox, reference) | No product seeds or migrations available |
+| Role ownership, key naming, immutability, seed data | P2-3‡ | `CHECK`s, immutability trigger, assignment trigger | DDL; seed file | T-RO01 to T-RO07, T-RO09 to T-RO11, T-M06, T-MIG01 | Executed (sandbox, reference) | T-RO08 (lint) specified only; no product seeds or migrations available |
 | Role keys are consistent across the document | P2-3‡ | Document check | `doc_consistency_check.py` | T-RO12 | Executed | Covers this document only |
 | FilterPlan static types are field-specific (guidance only) | P2-1‡ | TypeScript types | `filterplan_types.ts` | T-P20, T-P21, T-P23 | Executed with tsc 6.0.3 | Wire data and casts are not checked |
-| FilterPlan runtime validation before translation | P2-1‡ | Runtime validator (authoritative) | Reference validator in the harness | T-P01 to T-P19, T-P22 | Executed against the reference validator | Product validator not tested |
+| FilterPlan runtime validation before translation | P2-1‡ | Runtime validator (authoritative) | Reference validator in the harness | T-P01 to T-P07, T-P09 to T-P15, T-P18, T-P19, T-P22 | Executed against the reference validator | T-P08, T-P16, T-P17 specified only; product validator not tested |
 | Tenant predicate injected by the data layer; unguarded queries refused | v1.3 P1-4 | Data-access layer | Reference guard | T-P03, T-P12 | Executed (sandbox, reference) | Product data layer not tested |
 | Permission context namespace; role-permission contexts | v1.4 P2-3† | `CHECK`s and composite foreign keys | DDL | T-X10, T-N01 | Executed (sandbox, reference) | Lint and runtime handling (T-N02 to T-N06) specified only |
 | Migration to the invariants | P1-1‡, P2-2‡ | Scripts | Scratch database in the harness | T-MIG01 to T-MIG03 | Executed on a scratch database | Real data not available |
@@ -2874,11 +2973,11 @@ Evidence status: **Executed (sandbox, reference)** means the reference artifact 
 
 | Check | Result | Evidence or reason |
 |---|---|---|
-| Role ownership and tenant/system role invariants | PASS (reference DDL) | T-RO01 to T-RO11 and the 94 unchanged v1.4 tests still pass against the changed DDL |
-| Assignment eligibility and membership lifecycle | PASS (reference DDL and paths) | T-X05, T-M01 to T-M17 |
+| Role ownership and tenant/system role invariants | PASS (reference DDL) | T-RO01 to T-RO07, T-RO09 to T-RO11 (T-RO08 specified only), and the 94 v1.4 tests, which pass against the changed DDL (those touching the corrected 8.6 query and the lifecycle semantics were updated in v1.4.1, see D.1) |
+| Assignment eligibility and membership lifecycle | PASS (reference DDL and paths) | T-X05, T-M01 to T-M03, T-M05, T-M06, T-M08 to T-M17 (T-M04 and T-M07 specified only) |
 | Authorization across single, collection, bulk, background paths | PASS for the reference choke point; NOT VERIFIED for product paths | T-M08 to T-M12; no product code (T-M18) |
 | Audit classes, outbox semantics, sink-outage behavior | PASS for class A and C outbox semantics on the reference DDL and a simulated relay; NOT VERIFIED for the rest | T-U01, T-U09 to T-U15, T-F08, T-F14; no class B queue, class C read path, real relay or sink (T-U07, T-U16, T-F13) |
-| FilterPlan runtime validation before execution | PASS (reference validator) | T-P01 to T-P19, T-P22; NOT VERIFIED for the product validator |
+| FilterPlan runtime validation before execution | PASS (reference validator) | T-P01 to T-P07, T-P09 to T-P15, T-P18, T-P19, T-P22; T-P08, T-P16, T-P17 specified only; NOT VERIFIED for the product validator |
 | `tenant_access_denied` and the tenant-hint contract | NOT VERIFIED | No HTTP artifact (T-A01, T-A09 to T-A13 specified only) |
 | Cache grace and staleness policy | NOT VERIFIED | No cache or PDP artifact (T-V specified only) |
 | `platform.` namespace and permission-context consistency | PASS for the database checks; NOT VERIFIED for lint and runtime | T-N01, T-X10, T-RO09; T-N02 to T-N06 not run |
