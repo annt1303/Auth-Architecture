@@ -11,6 +11,75 @@ Kiến trúc tham chiếu và đặc tả triển khai cho hệ thống phân qu
 | [enterprise-authorization-architecture-v1_4_1.md](enterprise-authorization-architecture-v1_4_1.md) | English | 1.4.1 |
 | [enterprise-authorization-architecture-v1_4_1-vi.md](enterprise-authorization-architecture-v1_4_1-vi.md) | Tiếng Việt | 1.4.1 |
 
+## Kiến trúc tổng quan
+
+### Luồng xử lý một request
+
+```mermaid
+flowchart TD
+    Client["Client"] -->|"1. Credential"| IdP["Identity Provider<br/>xác thực, cấp token"]
+    IdP -->|"401 nếu sai"| PEP
+
+    subgraph Enforce["Điểm thực thi (PEP)"]
+        PEP["PEP<br/>áp dụng quyết định và obligation"]
+        CB["Context Builder<br/>TrustedContext từ token và tra cứu phía server"]
+        RR["Resource Resolver<br/>tải resource, truy vấn có tenant predicate"]
+    end
+
+    subgraph Decide["Điểm quyết định (PDP)"]
+        PDP["PDP<br/>Phase A: ngữ cảnh<br/>Phase B: bất biến<br/>Phase C: ứng viên<br/>Phase D: kết hợp<br/>Phase E: obligation"]
+        Data["Dữ liệu phân quyền<br/>membership, role, assignment,<br/>permission catalog, policy"]
+    end
+
+    subgraph Access["Truy cập dữ liệu"]
+        DAL["Data-Access Layer<br/>tenant predicate + FilterPlan"]
+        DB[("Database<br/>constraint, trigger, RLS tùy chọn")]
+    end
+
+    subgraph AuditSub["Audit"]
+        Outbox["Audit Outbox<br/>cùng database với dữ liệu"]
+        Relay["Relay"]
+        Sink["Audit Sink"]
+    end
+
+    PEP --> CB --> RR --> PDP
+    PDP --> Data
+    PDP -->|"ALLOW / DENY + obligation + FilterPlan"| PEP
+    PEP -->|"chỉ khi ALLOW"| DAL --> DB
+    DB -.->|"cùng transaction"| Outbox
+    PEP -.-> Outbox
+    PDP -.-> Outbox
+    Outbox --> Relay --> Sink
+
+    Cache["Cache<br/>không phải nguồn sự thật"] -.-> PDP
+```
+
+Nguyên tắc chính:
+
+- Deny-by-default: không có `ALLOW` tường minh thì từ chối; thiếu dữ liệu hoặc lỗi phụ thuộc thì **fail closed**.
+- Authentication chỉ xác định danh tính, không đồng nghĩa với quyền.
+- Giá trị từ client chỉ là gợi ý, không bao giờ là đầu vào của quyết định.
+- Data-Access Layer luôn thêm tenant predicate và `FilterPlan` cho mọi truy vấn dữ liệu của tenant.
+- PEP và PDP có thể là hai module trong cùng một ứng dụng, miễn là trách nhiệm được tách bạch.
+
+### Mô hình dữ liệu phân quyền
+
+```mermaid
+erDiagram
+    PRINCIPALS ||--o{ TENANT_MEMBERSHIPS : "có"
+    TENANTS ||--o{ TENANT_MEMBERSHIPS : "có"
+    TENANT_MEMBERSHIPS ||--o{ TENANT_ROLE_ASSIGNMENTS : "phải ACTIVE để nhận"
+    ROLES ||--o{ TENANT_ROLE_ASSIGNMENTS : "được gán"
+    PRINCIPALS ||--o{ PLATFORM_ROLE_ASSIGNMENTS : "nắm giữ"
+    ROLES ||--o{ PLATFORM_ROLE_ASSIGNMENTS : "được gán"
+    ROLES ||--o{ ROLE_PERMISSIONS : "gồm"
+    PERMISSIONS ||--o{ ROLE_PERMISSIONS : "thuộc"
+```
+
+- **Hai bảng gán quyền riêng:** `tenant_role_assignments` (có tenant và scope) và `platform_role_assignments` (không có tenant, không có scope), để cơ sở dữ liệu bảo đảm quyền platform và quyền tenant không bao giờ lẫn nhau.
+- **Role không mang scope.** Scope nằm ở assignment: `TENANT`, `COMPANY`, `DEPARTMENT`, `TEAM`, `RESOURCE` hoặc `SELF`.
+- **Quyền hiệu lực** của một assignment cần đồng thời: trạng thái `ACTIVE`, trong thời hạn hiệu lực, role được phép dùng trong tenant, membership `ACTIVE` và tenant `ACTIVE`.
+
 ## Nội dung chính
 
 - **Mục tiêu và baseline khuyến nghị:** least privilege, deny-by-default, fail-closed (mục 1)
