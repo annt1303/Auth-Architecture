@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: authz
+      POSTGRES_PASSWORD: authz
+      POSTGRES_DB: authz_demo
+    ports:
+      - "5433:5432"
+    volumes:
+      # Chạy 0001 -> 0002 -> 0003 theo thứ tự tên file, chỉ ở lần khởi tạo volume đầu tiên.
+      # Bỏ dữ liệu demo: xóa hoặc đổi tên db/0003_demo_data.sql trước khi chạy.
+      - ./db:/docker-entrypoint-initdb.d:ro
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authz -d authz_demo"]
+      interval: 3s
+      retries: 20
+
+  # App chạy trong Docker: `pnpm app:up`, mở http://localhost:8080. Một origin cho web, API và IdP giả lập.
+  api:
+    profiles: [app]
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgres://authz:authz@db:5432/authz_demo
+      TENANT_KEY: nhg-demo
+      AUTH_PROVIDER: dev-mock
+      API_ORIGIN: http://localhost:8080
+      WEB_ORIGIN: http://localhost:8080
+
+  web:
+    profiles: [app]
+    build: { context: ., dockerfile: apps/web/Dockerfile }
+    depends_on: [api]
+    ports:
+      - "8080:80"
+
+volumes:
+  db-data:

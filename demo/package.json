@@ -1,0 +1,18 @@
+{
+  "name": "authz-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "db:up": "docker compose up -d db",
+    "app:up": "docker compose --profile app up -d --build",
+    "app:down": "docker compose --profile app down",
+    "db:reset": "docker compose --profile app down -v && docker compose up -d db",
+    "db:test": "docker compose exec -T db psql -U authz -d authz_demo -v ON_ERROR_STOP=1 -f /docker-entrypoint-initdb.d/tests/invariants.sql",
+    "build:types": "pnpm --filter @authz-demo/authz-types build",
+    "dev:api": "pnpm build:types && pnpm --filter @authz-demo/api start:dev",
+    "test:api": "pnpm build:types && pnpm --filter @authz-demo/api test:e2e",
+    "typecheck": "pnpm build:types && pnpm --filter @authz-demo/api typecheck && pnpm --filter @authz-demo/web typecheck",
+    "dev:web": "pnpm build:types && pnpm --filter @authz-demo/web dev",
+    "build:web": "pnpm build:types && pnpm --filter @authz-demo/web build"
+  }
+}

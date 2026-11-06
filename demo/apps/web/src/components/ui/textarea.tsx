@@ -1,0 +1,11 @@
+import * as React from "react";
+import { cn } from "@/lib/utils";
+import { inputClasses } from "./input";
+
+function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
+  return (
+    <textarea data-slot="textarea" className={cn(inputClasses, "h-auto min-h-32 py-2.5 md:h-auto", className)} {...props} />
+  );
+}
+
+export { Textarea };
