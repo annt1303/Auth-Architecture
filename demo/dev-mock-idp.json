@@ -1,0 +1,21 @@
+{
+  "_comment": "Danh bạ của IdP giả lập (AUTH_PROVIDER=dev-mock). Đây là phía IdP, tách biệt với DB của app: có danh tính app chưa cấp tài khoản, domain không được phép, email chưa xác minh. Toàn bộ là dữ liệu giả.",
+  "issuer": "http://localhost:3000/dev-mock-idp",
+  "identities": [
+    { "sub": "mock|sysadmin", "email": "sysadmin@holding.test",  "email_verified": true, "name": "System Admin" },
+    { "sub": "mock|an",       "email": "an.tenant@holding.test", "email_verified": true, "name": "An (Tenant Admin)" },
+    { "sub": "mock|binh",     "email": "binh.alpha@alpha.test",  "email_verified": true, "name": "Bình (Admin Alpha)" },
+    { "sub": "mock|chi",      "email": "chi.fin@alpha.test",     "email_verified": true, "name": "Chi (Trưởng phòng Tài chính)" },
+    { "sub": "mock|dung",     "email": "dung.ap@alpha.test",     "email_verified": true, "name": "Dũng (Nhân viên Công nợ)" },
+    { "sub": "mock|em",       "email": "em.multi@alpha.test",    "email_verified": true, "name": "Em (Alpha CNTT + Beta Kinh doanh)" },
+    { "sub": "mock|giang",    "email": "giang.beta@beta.test",   "email_verified": true, "name": "Giang (Admin Beta)" },
+    { "sub": "mock|hoa",      "email": "hoa.log@alpha-log.test", "email_verified": true, "name": "Hoa (đang bị tạm ngưng)" },
+    { "sub": "mock|khanh",    "email": "khanh.temp@alpha.test",  "email_verified": true, "name": "Khánh (assignment đã hết hạn)" },
+    { "sub": "mock|thao",     "email": "thao.ngo@alpha.test",    "email_verified": true, "name": "Ngô Thị Phương Thảo (chưa có vai trò)" },
+
+    { "sub": "mock|new-hire",   "email": "new.hire@alpha.test",     "email_verified": true,  "name": "Người mới (chưa được cấp tài khoản)" },
+    { "sub": "mock|outsider",   "email": "outsider@example.com",    "email_verified": true,  "name": "Người ngoài (domain không được phép)" },
+    { "sub": "mock|partner",    "email": "lan@beta-partner.test",   "email_verified": true,  "name": "Lan (domain đang chờ duyệt)" },
+    { "sub": "mock|unverified", "email": "unverified@beta.test",    "email_verified": false, "name": "Email chưa xác minh" }
+  ]
+}
