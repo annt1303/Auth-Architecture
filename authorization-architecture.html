@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kiến trúc phân quyền: Reference Architecture và Design Options</title>
+<style>
+  :root {
+    --bg:#f6f7f9; --surface:#fff; --border:#e2e4ea; --text:#1b1d24; --muted:#5f6472; --code:#eceef3;
+    --accent:#2457d6;
+    --perm:#2563eb; --perm-bg:#e8f0ff;
+    --role:#7c3aed; --role-bg:#f0e8ff;
+    --scope:#059669; --scope-bg:#e1f5ec;
+    --user:#c2680a; --user-bg:#fdf0da;
+    --asg:#be185d; --asg-bg:#fde7f1;
+    --sys:#475569; --sys-bg:#eef1f5;
+    --data:#0e7490; --data-bg:#e0f3f7;
+    --deny:#b91c1c; --deny-bg:#fde8e8;
+    --ok:#15803d; --ok-bg:#e3f6e8;
+    --shadow:0 1px 2px rgba(20,24,40,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#0f1116; --surface:#171a21; --border:#2a2f3a; --text:#e8eaf0; --muted:#9aa1b2; --code:#232834; --accent:#7ea2ff;
+      --perm:#7aa5ff; --perm-bg:#1b2742; --role:#b79cff; --role-bg:#2a2147; --scope:#4fd1a1; --scope-bg:#14322a;
+      --user:#f0a94e; --user-bg:#3a2b12; --asg:#f48ab8; --asg-bg:#3d1a2c; --sys:#a3adc0; --sys-bg:#212631;
+      --data:#59c6dd; --data-bg:#13313a; --deny:#f28b8b; --deny-bg:#3c1a1a; --ok:#6fd08c; --ok-bg:#17301f; --shadow:none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#0f1116; --surface:#171a21; --border:#2a2f3a; --text:#e8eaf0; --muted:#9aa1b2; --code:#232834; --accent:#7ea2ff;
+    --perm:#7aa5ff; --perm-bg:#1b2742; --role:#b79cff; --role-bg:#2a2147; --scope:#4fd1a1; --scope-bg:#14322a;
+    --user:#f0a94e; --user-bg:#3a2b12; --asg:#f48ab8; --asg-bg:#3d1a2c; --sys:#a3adc0; --sys-bg:#212631;
+    --data:#59c6dd; --data-bg:#13313a; --deny:#f28b8b; --deny-bg:#3c1a1a; --ok:#6fd08c; --ok-bg:#17301f; --shadow:none;
+  }
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; scroll-padding-top:72px; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  code { font-family:ui-monospace,"Cascadia Code",Consolas,monospace; font-size:.88em; background:var(--code); padding:1px 5px; border-radius:4px; }
+  a { color:var(--accent); }
+  nav.top { position:sticky; top:0; z-index:10; background:var(--surface); border-bottom:1px solid var(--border); }
+  nav.top .in { max-width:1180px; margin:0 auto; padding:8px 20px; display:flex; gap:4px; align-items:center; overflow-x:auto; }
+  nav.top a { text-decoration:none; color:var(--muted); padding:6px 12px; border-radius:8px; white-space:nowrap; font-size:14px; }
+  nav.top a:hover { background:var(--sys-bg); color:var(--text); }
+  nav.top .spacer { flex:1; }
+  nav.top button { border:1px solid var(--border); background:var(--surface); color:var(--text); border-radius:8px; padding:5px 10px; cursor:pointer; font-size:13px; }
+  main { max-width:1180px; margin:0 auto; padding:28px 20px 80px; }
+  h1 { font-size:28px; margin:0 0 8px; line-height:1.25; }
+  h2 { font-size:22px; margin:56px 0 6px; }
+  h3 { font-size:17px; margin:28px 0 8px; }
+  p.lead { color:var(--muted); max-width:78ch; margin:0 0 20px; }
+  .sub { color:var(--muted); margin:0 0 16px; max-width:80ch; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow); }
+  .pad { padding:16px 18px; }
+  .grid { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); }
+  .grid.g2 { grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); }
+  .badge { display:inline-block; font-size:12px; font-weight:600; padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:var(--sys-bg); color:var(--sys); }
+  .badge.ok { background:var(--ok-bg); color:var(--ok); border-color:transparent; }
+  .badge.deny { background:var(--deny-bg); color:var(--deny); border-color:transparent; }
+  .principle { display:flex; gap:10px; padding:12px 14px; }
+  .principle b { color:var(--accent); font-variant-numeric:tabular-nums; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th,td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:13px; background:var(--sys-bg); }
+  .tablewrap { overflow-x:auto; border:1px solid var(--border); border-radius:12px; background:var(--surface); }
+  .tablewrap table td:first-child { font-weight:600; }
+
+  /* diagrams */
+  .diagram { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px; overflow-x:auto; }
+  .diagram svg { display:block; width:100%; height:auto; min-width:520px; }
+  svg text { font-family:system-ui,-apple-system,"Segoe UI",sans-serif; fill:var(--text); }
+  svg .nodebox { stroke-width:1.4; }
+  svg .k-perm { fill:var(--perm-bg); stroke:var(--perm); } svg .k-role { fill:var(--role-bg); stroke:var(--role); }
+  svg .k-scope { fill:var(--scope-bg); stroke:var(--scope); } svg .k-user { fill:var(--user-bg); stroke:var(--user); }
+  svg .k-asg { fill:var(--asg-bg); stroke:var(--asg); } svg .k-sys { fill:var(--sys-bg); stroke:var(--sys); }
+  svg .k-data { fill:var(--data-bg); stroke:var(--data); } svg .k-deny { fill:var(--deny-bg); stroke:var(--deny); }
+  svg .k-ok { fill:var(--ok-bg); stroke:var(--ok); }
+  svg .edge { stroke:var(--muted); stroke-width:1.4; fill:none; }
+  svg .edge.dash { stroke-dasharray:5 4; }
+  svg .elabel { font-size:11px; fill:var(--muted); paint-order:stroke; stroke:var(--surface); stroke-width:4px; }
+  svg .sub { font-size:11px; fill:var(--muted); }
+  svg marker path { fill:var(--muted); }
+  .legend { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 0; font-size:12.5px; color:var(--muted); }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .legend i { width:12px; height:12px; border-radius:3px; border:1.5px solid; display:inline-block; }
+
+  /* phases */
+  .phases { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; counter-reset:ph; }
+  .phase { padding:14px; border-radius:12px; border:1px solid var(--border); background:var(--surface); position:relative; }
+  .phase h4 { margin:0 0 6px; font-size:14px; }
+  .phase h4::before { counter-increment:ph; content:counter(ph, upper-alpha); display:inline-grid; place-items:center; width:22px; height:22px; border-radius:50%; background:var(--accent); color:#fff; margin-right:8px; font-size:12px; }
+  .phase ul { margin:0; padding-left:18px; color:var(--muted); font-size:13.5px; }
+
+  /* options */
+  .tabs { display:flex; flex-wrap:wrap; gap:6px; margin:14px 0; }
+  .tabs button { border:1px solid var(--border); background:var(--surface); color:var(--text); padding:8px 14px; border-radius:10px; cursor:pointer; font-size:14px; }
+  .tabs button[aria-selected="true"] { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  .optpick { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; margin-bottom:14px; }
+  .opt { text-align:left; border:1.5px solid var(--border); background:var(--surface); color:var(--text); border-radius:12px; padding:10px 12px; cursor:pointer; }
+  .opt:hover { border-color:var(--accent); }
+  .opt[aria-pressed="true"] { border-color:var(--accent); box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 25%,transparent); }
+  .opt b { display:block; font-size:14px; }
+  .opt small { color:var(--muted); font-size:12.5px; }
+  .detail { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:16px; align-items:start; }
+  @media (max-width:900px) { .detail { grid-template-columns:1fr; } }
+  .detail h3 { margin:0 0 4px; font-size:19px; }
+  .field { margin:12px 0 0; }
+  .field h5 { margin:0 0 3px; font-size:12.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  .field p,.field ul,.field ol { margin:0; padding-left:0; }
+  .field ul,.field ol { padding-left:20px; }
+  .pc { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .pc > div { padding:10px 12px; border-radius:10px; }
+  .pc .pro { background:var(--ok-bg); } .pc .con { background:var(--deny-bg); }
+  .pc h5 { margin:0 0 4px; } .pc ul { margin:0; padding-left:18px; font-size:14px; }
+  @media (max-width:560px) { .pc { grid-template-columns:1fr; } }
+  .mig { background:var(--sys-bg); border-radius:10px; padding:10px 12px; }
+
+  /* builder */
+  .builder { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
+  .builder label { font-size:13px; color:var(--muted); display:block; margin-bottom:4px; }
+  .builder select { width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:14px; }
+  .presets { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 14px; }
+  .presets button { border:1px solid var(--border); background:var(--surface); color:var(--text); border-radius:999px; padding:6px 14px; cursor:pointer; font-size:13.5px; }
+  .presets button:hover { border-color:var(--accent); }
+  .notes { margin-top:14px; display:grid; gap:8px; }
+  .note { padding:10px 12px; border-radius:10px; font-size:14px; }
+  .note.warn { background:var(--user-bg); } .note.good { background:var(--ok-bg); } .note.info { background:var(--sys-bg); }
+  .checklist { list-style:none; padding:0; margin:0; display:grid; gap:6px; }
+  .checklist li { display:flex; gap:10px; align-items:flex-start; padding:8px 12px; background:var(--surface); border:1px solid var(--border); border-radius:10px; }
+  .checklist input { margin-top:5px; }
+  footer { color:var(--muted); font-size:13px; margin-top:56px; border-top:1px solid var(--border); padding-top:16px; }
+</style>
+</head>
+<body>
+<nav class="top" aria-label="Điều hướng">
+  <div class="in">
+    <a href="#principles">Nguyên tắc</a>
+    <a href="#reference">Reference Architecture</a>
+    <a href="#options">Design Options</a>
+    <a href="#builder">Ghép hồ sơ</a>
+    <a href="#invariants">Bất biến và checklist</a>
+    <span class="spacer"></span>
+    <button id="themeBtn" type="button" aria-label="Đổi giao diện sáng tối">Sáng/Tối</button>
+  </div>
+</nav>
+
+<main>
+  <h1>Kiến trúc phân quyền: Reference Architecture và Design Options</h1>
+  <p class="lead">Một trang tổng hợp hai phần của bộ tài liệu: <b>Reference Architecture</b> (kiến trúc nền tảng, nguyên tắc bảo mật, một cách triển khai tham chiếu) và <b>Design Options Catalog</b> (22 pattern độc lập theo 5 trục, cộng một lớp tăng cường E+, để dự án tự chọn). Đây là đặc tả thiết kế, chưa được kiểm chứng trong môi trường sản phẩm.</p>
+
+  <section id="principles">
+    <h2>Nguyên tắc cốt lõi</h2>
+    <p class="sub">Tám nguyên tắc đúng với mọi lựa chọn thiết kế bên dưới.</p>
+    <div class="grid" id="principleGrid"></div>
+  </section>
+
+  <section id="reference">
+    <h2>Phần 1. Reference Architecture</h2>
+    <p class="sub">Các thành phần, luồng xử lý và mô hình dữ liệu của hồ sơ tham chiếu (M1 + PM1 + S1 + R1 + E1).</p>
+
+    <h3>1.1 Kiến trúc tổng quan và luồng một request</h3>
+    <div class="diagram" id="dgFlow"></div>
+    <div class="legend" id="lgFlow"></div>
+    <div class="grid g2" style="margin-top:14px">
+      <div class="card pad">
+        <b>Luồng xử lý một request</b>
+        <ol style="margin:8px 0 0;padding-left:20px;color:var(--muted)">
+          <li>Xác thực. Lỗi thì trả 401, không đánh giá.</li>
+          <li>Kiểm tra hình dạng request (400/422).</li>
+          <li>Tạo trusted context, xác định tenant từ membership.</li>
+          <li>Với một resource: tải bằng <code>WHERE tenant_id = :tenant AND id = :id</code>.</li>
+          <li>PDP đánh giá theo các phase A đến E.</li>
+          <li>PEP map kết quả ra HTTP và thực thi obligation.</li>
+          <li>Data-Access Layer áp tenant predicate và <code>FilterPlan</code>, rồi thực thi.</li>
+          <li>Ghi audit theo lớp sự kiện.</li>
+        </ol>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Thành phần</th><th>Trách nhiệm</th><th>Không chịu trách nhiệm</th></tr></thead>
+          <tbody id="compBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <h3>1.2 Mô hình tenant</h3>
+    <p class="sub">Không đồng nhất tenant, company, department và scope. Tenant là ranh giới cô lập; đơn vị tổ chức bên trong được biểu diễn bằng scope.</p>
+    <div class="diagram" id="dgTenant"></div>
+
+    <h3>1.3 Mô hình dữ liệu phân quyền (hồ sơ tham chiếu)</h3>
+    <div class="diagram" id="dgER"></div>
+    <div class="grid" style="margin-top:14px">
+      <div class="card pad"><b>Hai bảng gán, hai ngữ cảnh</b><p style="margin:6px 0 0;color:var(--muted)">Quyền platform và quyền tenant nằm ở hai bảng khác nhau để cơ sở dữ liệu bảo đảm chúng không lẫn nhau. Platform admin không có quyền dữ liệu tenant mặc định; muốn vào phải mở support session có thời hạn và phê duyệt.</p></div>
+      <div class="card pad"><b>Quyền hiệu lực</b><p style="margin:6px 0 0;color:var(--muted)">Một assignment <code>ACTIVE</code> chỉ có hiệu lực khi còn trong thời hạn, role dùng được trong tenant, membership <code>ACTIVE</code> và tenant <code>ACTIVE</code>. Hết hạn được tính lúc đánh giá, không dựa vào job.</p></div>
+      <div class="card pad"><b>Vòng đời membership</b><p style="margin:6px 0 0;color:var(--muted)">Suspend giữ assignment nhưng không còn hiệu lực. Reinstate làm chúng hiệu lực lại nếu còn hợp lệ. Remove thu hồi mọi assignment ngay trong transaction và không bao giờ tự khôi phục.</p></div>
+      <div class="card pad"><b>Không leo thang đặc quyền</b><p style="margin:6px 0 0;color:var(--muted)">Chỉ tạo role hoặc gán role trong phạm vi quyền mình đang có hiệu lực. Không tự gán cho chính mình; sửa shared template role cần <code>platform.role.manage</code>.</p></div>
+    </div>
+
+    <h3>1.4 Cách ra quyết định của PDP</h3>
+    <div class="diagram" id="dgPhases"></div>
+    <div class="phases" style="margin-top:14px">
+      <div class="phase"><h4>Context</h4><ul><li>Xác thực, kiểm request</li><li>Tạo trusted context</li><li>Action phải có trong catalog</li></ul></div>
+      <div class="phase"><h4>Bất biến</h4><ul><li>Principal <code>ACTIVE</code></li><li>Tenant và membership <code>ACTIVE</code></li><li>Context kind khớp</li><li>Tenant của resource khớp</li></ul></div>
+      <div class="phase"><h4>Thu thập</h4><ul><li>Grant hiệu lực đúng context</li><li>Ràng buộc bắt buộc</li><li>Explicit deny (nếu bật)</li></ul></div>
+      <div class="phase"><h4>Kết hợp</h4><ul><li>Deny tường minh</li><li>Lỗi tra cứu</li><li>Không có grant</li><li>Ngoài scope</li><li>Ràng buộc thất bại</li><li>Cuối cùng <code>ALLOW</code></li></ul></div>
+      <div class="phase"><h4>Obligation</h4><ul><li>Gộp obligation</li><li>PEP phải thực thi được mọi obligation bắt buộc, nếu không thì từ chối</li></ul></div>
+    </div>
+    <div class="tablewrap" style="margin-top:14px">
+      <table>
+        <thead><tr><th>Evaluation state</th><th>Ý nghĩa</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td>ALLOW</td><td>Có grant bao phủ, ràng buộc đạt</td><td><span class="badge ok">ALLOW</span></td></tr>
+          <tr><td>DENY</td><td>Quy tắc đánh giá được và từ chối</td><td><span class="badge deny">DENY</span></td></tr>
+          <tr><td>NOT_APPLICABLE</td><td>Không có grant</td><td><span class="badge deny">DENY</span></td></tr>
+          <tr><td>INDETERMINATE</td><td>Không đánh giá tin cậy được (lỗi phụ thuộc, thiếu thuộc tính)</td><td><span class="badge deny">DENY</span> + <code>evaluationFailed</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>1.5 Danh sách, tìm kiếm, export và bulk: FilterPlan</h3>
+    <div class="diagram" id="dgFilter"></div>
+    <p class="sub" style="margin-top:10px">Truy vấn cuối cùng là <code>tenantPredicate AND authzFilterPlan AND userFilter</code>. Tenant predicate do data layer tự thêm từ context; plan do PDP sinh từ hợp các scope; filter người dùng chỉ được thu hẹp. Không sinh được plan thì không query, không bao giờ fallback sang truy vấn không lọc. Điều kiện được áp trước <code>ORDER BY</code>, <code>LIMIT</code>, <code>COUNT</code>, aggregate và export.</p>
+
+    <h3>1.6 Ánh xạ HTTP và hành vi khi lỗi</h3>
+    <div class="grid g2">
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Tình huống</th><th>HTTP</th><th>Code</th></tr></thead>
+          <tbody>
+            <tr><td>Chưa xác thực / token sai</td><td>401</td><td><code>unauthenticated</code></td></tr>
+            <tr><td>Request sai, filter sai</td><td>400/422</td><td><code>invalid_request</code></td></tr>
+            <tr><td>Tenant không hợp lệ (mọi trường hợp con, phản hồi y hệt)</td><td>403</td><td><code>tenant_access_denied</code></td></tr>
+            <tr><td>Resource không có, khác tenant, hoặc không thấy</td><td>404</td><td><code>not_found</code></td></tr>
+            <tr><td>Thấy nhưng không được làm</td><td>403</td><td><code>forbidden</code></td></tr>
+            <tr><td>Danh sách: lọc bớt dòng</td><td>200</td><td>chỉ trả dòng được phép</td></tr>
+            <tr><td>Phụ thuộc lỗi (INDETERMINATE)</td><td>503</td><td><code>authorization_unavailable</code></td></tr>
+            <tr><td>Lỗi code, plan sai, obligation không thực thi được</td><td>500</td><td><code>internal_error</code></td></tr>
+            <tr><td>Cần xác thực mạnh hơn</td><td>401/403</td><td><code>step_up_required</code></td></tr>
+            <tr><td>Thử tenant lặp lại quá nhiều</td><td>429</td><td><code>rate_limited</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Lỗi</th><th>Hành vi</th></tr></thead>
+          <tbody>
+            <tr><td>PDP/policy engine không sẵn sàng</td><td>Từ chối, 503</td></tr>
+            <tr><td>Policy bundle đọc lỗi</td><td>Dùng bản đã kiểm chứng đang nạp; chưa có thì từ chối tất cả</td></tr>
+            <tr><td>Database phân quyền lỗi</td><td>INDETERMINATE, 503</td></tr>
+            <tr><td><code>resolveDataScope</code> lỗi</td><td>Không query, 503</td></tr>
+            <tr><td><code>FilterPlan</code> sai</td><td>500, không query, cảnh báo cao</td></tr>
+            <tr><td>Obligation bắt buộc không thực thi được</td><td>500, bỏ dữ liệu đã tải</td></tr>
+            <tr><td>Ghi outbox lỗi (sự kiện bắt buộc)</td><td>Rollback cả thay đổi, 500</td></tr>
+            <tr><td>Audit sink/relay ngừng</td><td>Thay đổi vẫn commit, relay retry</td></tr>
+            <tr><td>Cache lỗi hoặc quá hạn</td><td>Coi như miss, đọc nguồn sự thật</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="sub" style="margin-top:10px">Quy tắc 403 so với 404: nếu principal thấy resource (có permission visibility trong scope) nhưng thiếu quyền hành động thì 403, nếu không thấy thì 404.</p>
+
+    <h3>1.7 Cache, thu hồi quyền và audit</h3>
+    <div class="grid g2">
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Dữ liệu</th><th>Độ trễ thu hồi tối đa</th></tr></thead>
+          <tbody>
+            <tr><td>Assignment, membership, trạng thái principal/tenant</td><td>60 giây (hủy theo sự kiện, TTL làm lưới an toàn)</td></tr>
+            <tr><td>Role-permission</td><td>300 giây</td></tr>
+            <tr><td>Policy bundle</td><td>300 giây hội tụ giữa các instance</td></tr>
+            <tr><td>Access token</td><td>Tối đa 15 phút; token không mang quyền</td></tr>
+            <tr><td>Permission rủi ro HIGH</td><td>Không qua cache</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Lớp audit</th><th>Sự kiện</th><th>Nếu không ghi bền được</th></tr></thead>
+          <tbody>
+            <tr><td>A</td><td>Đổi role, assignment, membership, policy; support session; break-glass; impersonation</td><td>Rollback cả thay đổi</td></tr>
+            <tr><td>C</td><td>Ghi HIGH; đọc/export nhạy cảm</td><td>Rollback hoặc không trả dữ liệu</td></tr>
+            <tr><td>B</td><td>Từ chối, lỗi đánh giá</td><td>Không chặn; đếm và cảnh báo</td></tr>
+            <tr><td>D</td><td>Đọc thường, ghi rủi ro thấp</td><td>Được phép mất hoặc lấy mẫu</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="sub" style="margin-top:10px">Cache key phải chứa mọi chiều ảnh hưởng quyết định (<code>contextKind</code>, <code>tenantId</code>, <code>principalId</code>, <code>action</code>, resource hoặc scope, authorization epoch, <code>policyVersion</code>, assurance level) và không bao giờ cache <code>INDETERMINATE</code>. Sự kiện lớp A và C được ghi vào outbox cùng database và cùng transaction với thay đổi, rồi relay chuyển tới sink ít nhất một lần.</p>
+  </section>
+
+  <section id="options">
+    <h2>Phần 2. Design Options Catalog</h2>
+    <p class="sub">Không biến kiến trúc thành một hệ thống với thật nhiều cờ cấu hình: mỗi lựa chọn là một pattern độc lập với đủ tám mục (What, Architecture, Database Model, Authorization Flow, ưu/nhược, trade-off, use case, migration path). Chọn theo năm trục, bắt đầu từ RBAC cơ bản.</p>
+    <div class="diagram" id="dgAxes"></div>
+
+    <div class="tabs" role="tablist" id="axisTabs"></div>
+    <div class="optpick" id="optPick"></div>
+    <div class="card pad detail" id="optDetail"></div>
+
+    <h3>Bảng so sánh của trục đang chọn</h3>
+    <div class="tablewrap"><table id="cmpTable"></table></div>
+  </section>
+
+  <section id="builder">
+    <h2>Phần 3. Ghép hồ sơ của dự án</h2>
+    <p class="sub">Chọn một pattern cho mỗi trục để xem hồ sơ và các cảnh báo tương thích. Các hồ sơ mẫu chỉ để minh họa, không phải khuyến nghị bắt buộc.</p>
+    <div class="presets" id="presets"></div>
+    <div class="builder" id="builderSel"></div>
+    <div class="diagram" id="dgProfile" style="margin-top:14px"></div>
+    <div class="notes" id="profileNotes"></div>
+  </section>
+
+  <section id="invariants">
+    <h2>Bất biến chung và checklist</h2>
+    <p class="sub">Mười bất biến đúng với mọi pattern. Bất biến số 10 (cùng contract đầu ra) là điều giúp các pattern hoán đổi được mà không sửa PEP hay tầng truy cập dữ liệu.</p>
+    <div class="tablewrap"><table><thead><tr><th>#</th><th>Bất biến</th></tr></thead><tbody id="invBody"></tbody></table></div>
+    <h3>Checklist khi chốt</h3>
+    <ul class="checklist" id="checklist"></ul>
+  </section>
+
+  <footer>Trang này tóm lược <code>enterprise-authorization-architecture-v1_4_1-vi.md</code> và <code>authorization-design-options-vi.md</code>; khi hai bên khác nhau, tài liệu Markdown là căn cứ. Chỉ hồ sơ tham chiếu có mô tả dữ liệu và thuật toán đầy đủ; các pattern còn lại là hướng dẫn thiết kế cần dự án tự viết test.</footer>
+</main>
+
+<script>
+"use strict";
+
+/* ---------- Bộ vẽ sơ đồ SVG ---------- */
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs || {}) e.setAttribute(k, attrs[k]);
+  if (text != null) e.textContent = text;
+  return e;
+}
+/* spec: { nodes:{id:[col,row,label,kind,sub?]}, edges:[[from,to,label?,"dash"?]], w?,h?,gx?,gy? } */
+let diagramSeq = 0;
+function drawDiagram(host, spec) {
+  const mid = "ar" + (++diagramSeq);
+  const W = spec.w || 150, H = spec.h || 52, GX = spec.gx || 56, GY = spec.gy || 40, PAD = 14;
+  const ids = Object.keys(spec.nodes);
+  let maxC = 0, maxR = 0;
+  ids.forEach(id => { maxC = Math.max(maxC, spec.nodes[id][0]); maxR = Math.max(maxR, spec.nodes[id][1]); });
+  const width = PAD * 2 + (maxC + 1) * W + maxC * GX;
+  const height = PAD * 2 + (maxR + 1) * H + maxR * GY;
+  const svg = el("svg", { viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": spec.title || "Sơ đồ" });
+  const defs = el("defs");
+  const mk = el("marker", { id: mid, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "7", markerHeight: "7", orient: "auto-start-reverse" });
+  mk.appendChild(el("path", { d: "M0 0L10 5L0 10z" }));
+  defs.appendChild(mk); svg.appendChild(defs);
+  const pos = {};
+  ids.forEach(id => {
+    const [c, r] = spec.nodes[id];
+    pos[id] = { x: PAD + c * (W + GX), y: PAD + r * (H + GY) };
+  });
+  function anchor(a, b) { // điểm trên viền hộp a hướng về b
+    const ca = { x: pos[a].x + W / 2, y: pos[a].y + H / 2 }, cb = { x: pos[b].x + W / 2, y: pos[b].y + H / 2 };
+    const dx = cb.x - ca.x, dy = cb.y - ca.y;
+    const k = Math.min(dx !== 0 ? (W / 2 + 2) / Math.abs(dx) : Infinity, dy !== 0 ? (H / 2 + 2) / Math.abs(dy) : Infinity);
+    return { x: ca.x + dx * k, y: ca.y + dy * k };
+  }
+  (spec.edges || []).forEach(([a, b, label, style]) => {
+    if (!pos[a] || !pos[b]) return;
+    const p1 = anchor(a, b), p2 = anchor(b, a);
+    svg.appendChild(el("line", { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, class: "edge" + (style === "dash" ? " dash" : ""), "marker-end": `url(#${mid})` }));
+    if (label) svg.appendChild(el("text", { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 - 4, "text-anchor": "middle", class: "elabel" }, label));
+  });
+  ids.forEach(id => {
+    const [, , label, kind, sub] = spec.nodes[id];
+    const g = el("g");
+    g.appendChild(el("rect", { x: pos[id].x, y: pos[id].y, width: W, height: H, rx: 10, class: "nodebox k-" + (kind || "sys") }));
+    const lines = String(label).split("\n");
+    const total = lines.length + (sub ? 1 : 0);
+    const startY = pos[id].y + H / 2 - (total - 1) * 8 + 4;
+    lines.forEach((t, i) => g.appendChild(el("text", { x: pos[id].x + W / 2, y: startY + i * 16, "text-anchor": "middle", "font-size": "13", "font-weight": "600" }, t)));
+    if (sub) g.appendChild(el("text", { x: pos[id].x + W / 2, y: startY + lines.length * 16, "text-anchor": "middle", class: "sub" }, sub));
+    svg.appendChild(g);
+  });
+  host.innerHTML = ""; host.appendChild(svg);
+}
+const KIND_LABEL = { perm:"Permission", role:"Role", scope:"Scope", user:"Principal", asg:"Assignment / quan hệ", sys:"Thành phần hệ thống", data:"Dữ liệu", deny:"Từ chối / lỗi", ok:"Cho phép" };
+function legend(host, kinds) {
+  host.innerHTML = "";
+  kinds.forEach(k => {
+    const s = document.createElement("span");
+    s.innerHTML = `<i style="background:var(--${k}-bg);border-color:var(--${k})"></i>${KIND_LABEL[k]}`;
+    host.appendChild(s);
+  });
+}
+
+/* ---------- Nội dung tham chiếu ---------- */
+const PRINCIPLES = [
+  ["Deny-by-default", "Không có ALLOW tường minh thì từ chối."],
+  ["Fail closed", "Thiếu dữ liệu hoặc lỗi phụ thuộc thì từ chối, không bao giờ mở quyền."],
+  ["Authentication không phải authorization", "Token chỉ cho biết bạn là ai, không mang danh sách quyền."],
+  ["Không tin client", "Tenant, role, scope từ client chỉ là gợi ý, luôn được server kiểm tra lại."],
+  ["Một đường đánh giá duy nhất", "Cho API, danh sách, export, bulk, job nền."],
+  ["Tenant isolation là bất biến", "Không phụ thuộc UI hay tham số client."],
+  ["Mọi thay đổi quyền đều được audit", "Có lớp sự kiện và bảo đảm ghi bền theo từng lớp."],
+  ["Bắt đầu bằng RBAC", "Chỉ thêm ABAC, ReBAC, policy engine khi có yêu cầu cụ thể."]
+];
+const COMPONENTS = [
+  ["Identity Provider", "Xác thực, cấp token ngắn hạn", "Quyết định quyền truy cập resource"],
+  ["Context Builder", "Tạo TrustedContext từ token và tra cứu server", "Đánh giá policy"],
+  ["Resource Resolver", "Tải resource và thuộc tính tenant/scope chính thức", "Quyết định quyền"],
+  ["PEP", "Gọi PDP, thực thi quyết định và obligation, map ra HTTP", "Tính quyết định"],
+  ["PDP", "Đánh giá grant, ràng buộc, policy; trả quyết định và FilterPlan", "Chạy hành động, sinh SQL"],
+  ["Data-Access Layer", "Thêm tenant predicate, áp FilterPlan, từ chối query không được bảo vệ", "Chọn scope"],
+  ["Database", "Constraint, trigger; RLS tùy chọn", "Thay thế authorization ở ứng dụng"],
+  ["Audit outbox", "Ghi bền sự kiện quan trọng cùng transaction", "Chờ sink downstream"],
+  ["Cache", "Tăng tốc đọc", "Là nguồn sự thật"]
+];
+const INVARIANTS = [
+  "Deny-by-default, fail closed: thiếu dữ liệu hoặc lỗi phụ thuộc thì từ chối.",
+  "Authentication không phải authorization; token không mang danh sách quyền.",
+  "Tenant lấy từ membership phía server, không tin client; tenant isolation độc lập với scope.",
+  "Scope không bao giờ đến từ client; giá trị client chỉ được thu hẹp kết quả.",
+  "Scope đã lưu hoặc suy ra không phải bằng chứng: kiểm với resource tải từ nguồn chính thức.",
+  "Một đường đánh giá duy nhất cho API, danh sách, export, bulk, job nền.",
+  "Quyết định danh sách đi qua FilterPlan có kiểu, thêm trước phân trang và đếm.",
+  "Quyền quản trị không cho leo thang đặc quyền và không tự gán.",
+  "Thay đổi quyền được audit; cache key chứa mọi đầu vào ảnh hưởng quyết định.",
+  "Mọi pattern trả cùng contract đầu ra: ALLOW/DENY và FilterPlan, để PEP và data layer không phụ thuộc pattern."
+];
+const CHECKLIST = [
+  "Đã bắt đầu từ M1 và chỉ thêm M2 đến M5 khi có yêu cầu cụ thể.",
+  "Đã chọn một tổ chức permission (PM1 đến PM4) và một quy ước đặt tên, có lint trong CI.",
+  "Đã chọn cách gắn scope cho từng nhóm permission (S1 đến S6 hoặc hybrid) và nguồn có thẩm quyền của scope.",
+  "Đã chọn kênh gán role (R1 đến R4) và có cách giải thích vì sao một người có quyền.",
+  "Đã chọn enforcement (E1 đến E3, có hoặc không E+) và giữ interface check/resolveDataScope ổn định.",
+  "Đã xác nhận đủ 10 bất biến cho tổ hợp đã chọn.",
+  "Với mọi pattern ngoài hồ sơ tham chiếu: đã viết test cho scope, hết hạn, thu hồi, chéo tenant, danh sách, bulk, lỗi phụ thuộc.",
+  "Đã ghi ADR cho từng trục, kèm dấu hiệu và đường chuyển đổi."
+];
+
+/* ---------- Các sơ đồ của Reference Architecture ---------- */
+const FLOW = {
+  title: "Kiến trúc tổng quan và luồng một request", w: 150, h: 50, gx: 52, gy: 34,
+  nodes: {
+    client: [0, 1, "Client", "user"], idp: [1, 1, "Identity Provider", "sys", "xác thực, cấp token"],
+    pep: [2, 1, "PEP", "sys", "áp quyết định, HTTP"], cb: [3, 0, "Context Builder", "sys", "TrustedContext"],
+    rr: [4, 0, "Resource Resolver", "sys", "tenant predicate"], pdp: [4, 1, "PDP", "role", "đánh giá, kết hợp"],
+    data: [5, 1, "Dữ liệu phân quyền", "data", "membership, role, assignment"], cache: [5, 0, "Cache", "sys", "không là nguồn sự thật"],
+    dal: [2, 2, "Data-Access Layer", "sys", "tenant + FilterPlan"], db: [1, 2, "Database", "data"],
+    audit: [3, 2, "Audit outbox", "asg", "cùng transaction"]
+  },
+  edges: [["client","idp","credential"],["idp","pep","token"],["pep","cb"],["cb","rr"],["rr","pdp"],["pdp","data"],
+          ["cache","pdp","","dash"],["pdp","pep","ALLOW/DENY + FilterPlan"],["pep","dal","chỉ khi ALLOW"],["dal","db"],["dal","audit","outbox"]]
+};
+const TENANT = {
+  title: "Mô hình tenant", w: 170, h: 46, gx: 50, gy: 20,
+  nodes: {
+    plat: [0, 1, "Platform", "sys"],
+    ta: [1, 0, "Tenant: Tập đoàn A", "role", "ranh giới bảo mật và quản trị"], tb: [1, 2, "Tenant: Tập đoàn B", "role"],
+    c1: [2, 0, "Company A1", "scope"], c2: [2, 1, "Company A2", "scope"],
+    d1: [3, 0, "Department Finance", "asg"], d2: [3, 1, "Department Operations", "asg"]
+  },
+  edges: [["plat","ta"],["plat","tb"],["ta","c1"],["ta","c2"],["c1","d1"],["c1","d2"]]
+};
+const ER = {
+  title: "Mô hình dữ liệu phân quyền", w: 170, h: 46, gx: 76, gy: 34,
+  nodes: {
+    tenants: [0, 0, "tenants", "data", "status ACTIVE/SUSPENDED"], principals: [0, 2, "principals", "user", "USER/SERVICE"],
+    mem: [1, 1, "tenant_memberships", "data", "ACTIVE/SUSPENDED/REMOVED"],
+    tra: [2, 1, "tenant_role_assignments", "asg", "scope, valid_from/until"],
+    pra: [2, 2, "platform_role_assignments", "asg", "không tenant, không scope"],
+    roles: [3, 1, "roles", "role", "role_kind, is_system_defined"],
+    rp: [3, 0, "role_permissions", "perm"], perms: [4, 0, "permissions", "perm", "context_kind, risk_level"],
+    audit: [4, 2, "audit_outbox", "sys", "cùng database"]
+  },
+  edges: [["tenants","mem"],["principals","mem"],["mem","tra","ACTIVE"],["roles","tra"],["principals","pra"],["roles","pra"],["roles","rp"],["rp","perms"],["pra","audit","sự kiện lớp A","dash"]]
+};
+const PHASES = {
+  title: "Các phase đánh giá", w: 150, h: 50, gx: 40, gy: 20,
+  nodes: {
+    a: [0, 0, "A. Context", "sys"], b: [1, 0, "B. Bất biến", "deny", "không grant nào ghi đè"],
+    c: [2, 0, "C. Thu thập", "data"], d: [3, 0, "D. Kết hợp", "role"], e: [4, 0, "E. Obligation", "asg"],
+    out: [5, 0, "Quyết định", "ok", "ALLOW / DENY"]
+  },
+  edges: [["a","b"],["b","c"],["c","d"],["d","e"],["e","out"]]
+};
+const FILTER = {
+  title: "FilterPlan cho danh sách", w: 170, h: 50, gx: 44, gy: 22,
+  nodes: {
+    req: [0, 1, "GET /documents?status=ACTIVE", "user"], pdp: [1, 0, "PDP: resolveDataScope", "role", "hợp các scope hiệu lực"],
+    plan: [2, 0, "authzFilterPlan", "scope", "dữ liệu, có kiểu, không là code"],
+    dal: [2, 1, "Data-Access Layer", "sys", "thêm tenantPredicate"], uf: [1, 2, "userFilter", "asg", "chỉ thu hẹp"],
+    q: [3, 1, "Truy vấn tham số hóa", "data", "tenant AND plan AND userFilter"], res: [4, 1, "Chỉ dòng được phép", "ok"]
+  },
+  edges: [["req","pdp"],["pdp","plan"],["plan","dal"],["uf","dal"],["dal","q"],["q","res"]]
+};
+const AXES_DG = {
+  title: "Năm trục lựa chọn", w: 160, h: 56, gx: 56, gy: 20,
+  nodes: {
+    a: [0, 0, "A. Mô hình", "role", "M1 đến M5"], b: [1, 0, "B. Permission", "perm", "PM1 đến PM4"],
+    c: [2, 0, "C. Scope", "scope", "S1 đến S6"], d: [3, 0, "D. Gán Role", "asg", "R1 đến R4"], e: [4, 0, "E. Enforcement", "sys", "E1 đến E3 (+E+)"]
+  },
+  edges: [["a","b"],["b","c"],["c","d"],["d","e"]]
+};
+
+/* ---------- Danh mục pattern ---------- */
+const AXES = [
+  { id: "A", name: "A. Mô hình", q: "Quyền được quyết định dựa trên gì?" },
+  { id: "B", name: "B. Permission", q: "Permission được đặt tên và cấu trúc ra sao?" },
+  { id: "C", name: "C. Scope", q: "Phạm vi dữ liệu được lưu hoặc suy ra ở đâu?" },
+  { id: "D", name: "D. Gán Role", q: "Ai nhận role, qua kênh nào?" },
+  { id: "E", name: "E. Enforcement", q: "Logic kiểm tra quyền chạy ở đâu?" }
+];
+const OPTS = [
+ /* ---- Trục A ---- */
+ { axis:"A", id:"M1", name:"M1 Basic RBAC", short:"User → Role → Permission",
+   what:"Quyền xác định qua role: người dùng được gán role, role chứa permission. Không có điều kiện dữ liệu. Là điểm xuất phát của mọi hồ sơ.",
+   arch:"PEP gọi PDP; PDP tra các role hiệu lực của principal rồi hợp permission của chúng.",
+   db:["principals: id, loại, trạng thái","roles: id, key, chủ sở hữu","permissions: id, key, mức rủi ro","role_permissions: role_id, permission_id","role_assignments: principal, role, thời hạn, trạng thái"],
+   flow:["Xác thực, xác định tenant từ membership","Lấy role hiệu lực (còn hạn, membership ACTIVE)","Hợp permission của các role","Có permission cần kiểm thì ALLOW, không thì DENY"],
+   pros:["Đơn giản, dễ audit và cache","Dễ quản trị bằng giao diện","Phù hợp mọi framework"], cons:["Không giới hạn được theo dữ liệu","Role explosion khi nghiệp vụ phức tạp","Không có điều kiện phụ thuộc dữ liệu"],
+   trade:"Đơn giản đổi lấy độ chi tiết. Nhu cầu giới hạn dữ liệu phải đi qua trục Scope hoặc bổ sung M3/M4.",
+   use:"Ứng dụng nhỏ đến vừa, CRUD, ít nhóm người dùng, vai trò ổn định.",
+   mig:"Bổ sung khi cần giới hạn theo phòng ban (thêm trục Scope, S1 trước), khi cần điều kiện theo trạng thái (M3), khi cần chia sẻ từng bản ghi (M4). Không phải bỏ M1.",
+   dg:{ nodes:{u:[0,0,"Principal","user"],r:[1,0,"Role","role"],p:[2,0,"Permission","perm"]}, edges:[["u","r","được gán"],["r","p","chứa"]] } },
+ { axis:"A", id:"M2", name:"M2 Hierarchical RBAC", short:"Role kế thừa role",
+   what:"Role được tổ chức thành cây; role cấp cao kế thừa permission của role cấp thấp.",
+   arch:"PDP mở rộng tập role của principal thành tập role cộng mọi role được kế thừa, rồi áp M1.",
+   db:["role_inheritance: parent_role_id, child_role_id","Ràng buộc: cấm chu trình, giới hạn độ sâu, cha và con cùng loại và cùng chủ sở hữu"],
+   flow:["Lấy role hiệu lực như M1","Duyệt cây để thêm role được kế thừa (tính trước, cache theo phiên bản hierarchy)","Hợp permission rồi đánh giá như M1"],
+   pros:["Giảm khai báo permission trùng lặp","Khớp tổ chức có cấp bậc","Tái sử dụng quyền"], cons:["Đổi role cha lan sang nhiều role con","Khó giải thích nguồn gốc một quyền","Cần xử lý chu trình, độ sâu, xung đột"],
+   trade:"Giảm trùng lặp nhưng tăng độ khó audit và cache (đổi hierarchy phải hủy cache rộng).",
+   use:"Tổ chức có cấp bậc ổn định, role mở rộng từ nhau theo một chiều.",
+   mig:"Từ M1 khi nhiều role lặp lại cùng nhóm permission. Quay về M1 phẳng khi hierarchy rối. Nếu kế thừa thực chất theo phạm vi tổ chức, dùng trục Scope thay vì hierarchy role.",
+   dg:{ nodes:{a:[0,0,"Admin","role"],m:[1,0,"Manager","role"],s:[2,0,"Supervisor","role"],e:[3,0,"Employee","role"]}, edges:[["a","m","kế thừa"],["m","s","kế thừa"],["s","e","kế thừa"]] } },
+ { axis:"A", id:"M3", name:"M3 RBAC + ABAC", short:"Thêm điều kiện theo thuộc tính",
+   what:"Giữ RBAC cho việc được làm gì và thêm điều kiện dựa trên thuộc tính của subject, resource và môi trường.",
+   arch:"PDP kiểm grant từ role rồi kiểm điều kiện thuộc tính. Chỉ thuộc tính trong attribute registry mới được dùng.",
+   db:["Attribute registry: tên, kiểu, nguồn có thẩm quyền, độ tươi tối đa","Thuộc tính resource: cột trên resource (status, department_id)","Thuộc tính subject: từ HR/IdP hoặc bảng nội bộ","Điều kiện bắt buộc theo permission"],
+   flow:["Xác định có grant (như M1)","Nạp thuộc tính từ nguồn chính thức","Đánh giá điều kiện; thiếu thuộc tính thì INDETERMINATE","Tất cả đạt thì ALLOW; với danh sách điều kiện thành node của FilterPlan"],
+   pros:["Biểu diễn điều kiện nghiệp vụ không cần thêm role","Quyền theo trạng thái, thời gian, phân loại","Kết hợp với mọi cách gắn scope"], cons:["Policy khó debug nếu thiếu giải thích","Phụ thuộc chất lượng thuộc tính","Điều kiện phải dịch được sang FilterPlan"],
+   trade:"Linh hoạt đổi lấy khả năng giải thích và kiểm thử. Giới hạn số thuộc tính và chỉ thêm khi có yêu cầu.",
+   use:"Quyền phụ thuộc trạng thái bản ghi, phân loại, giờ làm việc, mức xác thực.",
+   mig:"Từ M1 khi một quy tắc không diễn đạt được bằng role và scope. Chuyển sang M5 khi số quy tắc nhiều đến mức cần vòng đời policy riêng.",
+   dg:{ nodes:{r:[0,0,"Grant từ Role","role"],c:[1,0,"Điều kiện thuộc tính","scope"],d:[2,0,"Quyết định","ok"],pip:[1,1,"PIP: attribute registry","data"]}, edges:[["r","c"],["c","d"],["pip","c","thuộc tính","dash"]] } },
+ { axis:"A", id:"M4", name:"M4 RBAC + ReBAC / ACL", short:"Quyền theo quan hệ với resource",
+   what:"Quyền phụ thuộc quan hệ giữa principal và resource (chủ sở hữu, thành viên, người được chia sẻ) hoặc danh sách quyền gắn vào resource.",
+   arch:"Role cho biết loại hành động được phép; kho quan hệ cho biết trên bản ghi nào.",
+   db:["resource_relationships: tenant, subject, relation, resource, hiệu lực","resource_acl (biến thể ACL): resource, subject, permissions","Quy tắc kế thừa quan hệ (tùy chọn)"],
+   flow:["Kiểm permission qua role","Tải resource kèm tenant predicate; tra quan hệ","Quan hệ đủ cho hành động thì ALLOW","Danh sách: sinh FilterPlan từ resource mà principal có quan hệ"],
+   pros:["Chính xác đến từng resource","Biểu diễn chia sẻ và sở hữu tự nhiên","Hỗ trợ kế thừa theo cấu trúc"], cons:["Cần quản lý kho quan hệ","Đánh giá phức tạp khi nhiều tầng","Lọc tập hợp lớn khó"],
+   trade:"ACL đơn giản nhưng khó quản trị tập trung; ReBAC mạnh hơn nhưng cần hạ tầng đồ thị. Chọn nguồn sự thật duy nhất cho mỗi quan hệ.",
+   use:"Nền tảng cộng tác, quản lý tài liệu, dự án, chia sẻ tài nguyên.",
+   mig:"Thêm vào M1 khi có yêu cầu chia sẻ hoặc chỉ chủ sở hữu được sửa. Bắt đầu với quan hệ phẳng; chuyển sang engine chuyên dụng khi cần kế thừa nhiều tầng. Nếu quan hệ thuộc về đơn vị tổ chức, dùng S1/S4.",
+   dg:{ nodes:{u:[0,0,"Principal","user"],r:[1,0,"Role: loại hành động","role"],res:[2,0,"Resource","data"],rel:[1,1,"Kho quan hệ / ACL","asg"]}, edges:[["u","r"],["r","res","được làm gì"],["u","rel","quan hệ"],["rel","res","trên bản ghi nào"]] } },
+ { axis:"A", id:"M5", name:"M5 Policy-Based (PBAC)", short:"Policy có phiên bản quyết định",
+   what:"Quyết định do tập policy có phiên bản đưa ra, có thể kết hợp RBAC, ABAC, ReBAC; logic tách khỏi mã nghiệp vụ.",
+   arch:"PDP là policy engine; policy bundle có phiên bản do PAP quản lý, phát hành, rollback; PIP cung cấp thuộc tính.",
+   db:["Policy bundle: phiên bản, checksum","Lịch sử phát hành: ai, khi nào, bản trước","Liên kết permission–policy","Dữ liệu cho policy qua PIP"],
+   flow:["PEP gửi (principal, action, resource, context) tới PDP","PDP nạp bundle hiệu lực, thu thập dữ liệu qua PIP","Đánh giá theo thuật toán kết hợp","Trả quyết định, obligation, mã lý do và FilterPlan"],
+   pros:["Tách authorization khỏi business logic","Phù hợp nhiều quy tắc, thay đổi thường xuyên","Chia sẻ giữa nhiều ứng dụng"], cons:["Thêm hạ tầng: engine, pipeline phát hành, test policy","Độ trễ nếu engine ở xa","Bundle hỏng phải fail closed"],
+   trade:"Mạnh và tập trung đổi lấy chi phí vận hành. Cần review policy, test hồi quy, giải thích quyết định.",
+   use:"Doanh nghiệp lớn, nhiều ứng dụng cùng chính sách, yêu cầu tuân thủ về vòng đời policy.",
+   mig:"Từ M3 khi mã chính sách rải rác nhiều ứng dụng. Đưa từng nhóm ràng buộc vào policy, chạy song song so sánh quyết định rồi chuyển hẳn. Đi cùng E3 hoặc E2 nhúng engine.",
+   dg:{ nodes:{pep:[0,0,"PEP","sys"],pdp:[1,0,"PDP (policy engine)","role"],pap:[2,0,"PAP: bundle có phiên bản","asg"],pip:[1,1,"PIP: thuộc tính, quan hệ","data"]}, edges:[["pep","pdp","yêu cầu"],["pap","pdp","phát hành"],["pip","pdp","dữ liệu","dash"]] } },
+
+ /* ---- Trục B ---- */
+ { axis:"B", id:"PM1", name:"PM1 Resource.Action", short:"document.read, document.update",
+   what:"Permission là cặp tài nguyên và hành động, ví dụ document.read, document.update.",
+   arch:"Danh mục phẳng; mỗi permission thuộc một resource type và một action. Kiểm tra là so khớp khóa.",
+   db:["permissions: id, key, resource_type, action, context_kind, risk_level, mô tả, deprecated_at"],
+   flow:["Yêu cầu mang action là khóa permission","PDP kiểm khóa có trong catalog (không có là lỗi của bên gọi)","Tra grant như M1"],
+   pros:["Rõ ràng, dễ đặt tên và tìm","Resource và action mở rộng độc lập","Không phụ thuộc giao diện"], cons:["Ít biểu đạt hành động nghiệp vụ","Số permission có thể phình","Chưa nói gì về phạm vi dữ liệu"],
+   trade:"CRUD thuần dễ cài đặt nhưng che mất hành động nghiệp vụ; khi cần, chuyển sang PM2.",
+   use:"Hầu hết ứng dụng web và API; điểm xuất phát chuẩn.",
+   mig:"Sang PM2 khi có hành động không khớp CRUD: thêm permission mới, không đổi tên cũ. Sang PM3 khi số module tăng và khóa va chạm.",
+   dg:{ nodes:{res:[0,0,"Resource: document","data"],act:[1,0,"Action: update","asg"],key:[2,0,"document.update","perm"]}, edges:[["res","key"],["act","key"]] } },
+ { axis:"B", id:"PM2", name:"PM2 Business Actions", short:"project.approve, order.refund",
+   what:"Ngoài CRUD, permission mô tả hành động nghiệp vụ: approve, archive, export, refund, transfer.",
+   arch:"Cùng danh mục phẳng như PM1 nhưng gồm CRUD, nhóm mở rộng (list, export, import) và nhóm nghiệp vụ (approve, publish, assign, transfer).",
+   db:["Như PM1, thêm action_kind (CRUD / EXTENDED / BUSINESS)","risk_level chính xác hơn: hành động nhạy cảm là HIGH, không qua cache"],
+   flow:["Như PM1","Hành động nghiệp vụ thường kèm ràng buộc trạng thái và obligation, nên hay đi cùng M3 hoặc PM4"],
+   pros:["Khớp ngôn ngữ nghiệp vụ","Kiểm soát riêng hành động rủi ro cao"], cons:["Danh mục lớn hơn, cần quản trị chặt","Dễ đặt tên không nhất quán nếu thiếu quy ước"],
+   trade:"Chi tiết hơn cho nghiệp vụ nhưng tăng chi phí quản trị role. Gom theo năng lực nghiệp vụ, không theo từng nút.",
+   use:"Workflow doanh nghiệp, phê duyệt nhiều bước, tài chính, nhân sự.",
+   mig:"Từ PM1 bằng cách thêm permission mới vào role phù hợp. Chỉ tách permission cũ khi một hành động CRUD thực chất mang nhiều nghĩa nghiệp vụ; dùng migration danh mục có phiên bản.",
+   dg:{ nodes:{crud:[0,0,"CRUD","asg"],ext:[1,0,"Mở rộng\nlist, export","asg"],biz:[2,0,"Nghiệp vụ\napprove, refund","asg"],cat:[1,1,"Permission catalog","perm"]}, edges:[["crud","cat"],["ext","cat"],["biz","cat"]] } },
+ { axis:"B", id:"PM3", name:"PM3 Module Namespace", short:"project.milestone.update",
+   what:"Khóa permission có tiền tố module: <module>.<resource>.<action>.",
+   arch:"Mỗi module đăng ký permission của mình vào catalog trung tâm; quy ước đặt tên được lint trong CI.",
+   db:["Như PM1, thêm module và owner_team","Khóa duy nhất toàn cục","Permission nền tảng giữ tiền tố platform. để loại ngữ cảnh nhìn thấy trong khóa"],
+   flow:["Như PM1","Module không đọc bảng của module khác để kiểm quyền mà qua PDP"],
+   pros:["Không va chạm tên khi nhiều đội","Có chủ sở hữu rõ cho từng nhóm","Lọc, báo cáo theo module"], cons:["Khóa dài hơn","Cần quy ước và lint","Đổi tên module kéo theo migration"],
+   trade:"Chi phí đặt tên và quản trị đổi lấy khả năng mở rộng theo số đội.",
+   use:"Nhiều module hoặc nhiều đội, modular monolith hoặc microservice dùng chung catalog.",
+   mig:"Từ PM1 khi catalog có nhiều đội cùng sửa. Ánh xạ khóa cũ sang mới bằng bảng map có phiên bản, hỗ trợ cả hai trong giai đoạn chuyển tiếp, rồi đánh dấu deprecated_at.",
+   dg:{ nodes:{m:[0,0,"Module: project","sys"],r:[1,0,"Resource: milestone","data"],a:[2,0,"Action: update","asg"],k:[1,1,"project.milestone.update","perm"]}, edges:[["m","r"],["r","a"],["r","k"]] } },
+ { axis:"B", id:"PM4", name:"PM4 Permission + Policy", short:"Permission tham chiếu policy",
+   what:"Mỗi permission (hoặc cặp role–permission) tham chiếu một policy quy định điều kiện áp dụng.",
+   arch:"Catalog có thêm liên kết permission → policy. PDP tra grant rồi nạp và đánh giá policy tham chiếu.",
+   db:["permission_policies: permission_id, policy_id, phạm vi áp dụng","policies: id, tên, phiên bản, trạng thái phát hành"],
+   flow:["Tra grant cho permission","Nạp policy gắn với permission (phiên bản hiệu lực)","Đánh giá policy; lỗi thì INDETERMINATE","Cả hai đạt thì ALLOW"],
+   pros:["Tách permission khỏi điều kiện nghiệp vụ","Đổi điều kiện không đổi role"], cons:["Cần policy engine hoặc lớp đánh giá","Thêm một chiều cần version và cache"],
+   trade:"Linh hoạt đổi lấy độ phức tạp; chỉ gắn policy cho permission thật sự có điều kiện.",
+   use:"Hệ thống dùng M3 hoặc M5, nhiều quy tắc gắn với từng hành động.",
+   mig:"Từ PM1/PM2 khi điều kiện nằm trong mã nghiệp vụ: trích ra thành policy, gắn vào permission, chạy song song so sánh trước khi bỏ kiểm tra trong mã.",
+   dg:{ nodes:{p:[0,0,"Permission","perm"],pol:[1,0,"Policy tham chiếu","asg"],ev:[2,0,"Đánh giá","role"],d:[3,0,"Quyết định","ok"]}, edges:[["p","pol"],["pol","ev"],["ev","d"]] } },
+
+ /* ---- Trục C ---- */
+ { axis:"C", id:"S1", name:"S1 Assignment-bound", short:"Scope nằm trên phân công role",
+   what:"Scope là một phần của phân công role: gán role editor tại COMPANY company-a. Bản thân role không mang scope. Đây là hồ sơ tham chiếu.",
+   arch:"Principal → assignment (role + scope + thời hạn) → Role → Permission.",
+   db:["role_assignments: tenant, principal, role, scope_type, scope_id, valid_from, valid_until, status, created_by, approval_reference","scope_id rỗng chỉ với TENANT/SELF","Không hai dòng ACTIVE trùng (principal, role, scope); assignment thu hồi là trạng thái cuối"],
+   flow:["Lấy assignment hiệu lực chứa permission cần kiểm","Một resource: tải kèm tenant predicate, kiểm có scope phủ resource","Danh sách: hợp các scope thành FilterPlan (team_id IN ...)"],
+   pros:["Một role dùng cho mọi scope, ít role","Grant tường minh, audit rõ ai cấp, ở đâu","Thu hồi và hết hạn theo từng scope"], cons:["Mỗi (principal, role, scope) một dòng","Đổi cơ cấu tổ chức phải bảo trì assignment","Quản trị phức tạp khi nhiều scope"],
+   trade:"Minh bạch và linh hoạt đổi lấy chi phí bảo trì dữ liệu assignment.",
+   use:"Một người giữ cùng role ở nhiều đơn vị; ủy quyền theo từng đơn vị; yêu cầu audit chi tiết.",
+   mig:"Sang S2/S4 khi scope luôn trùng đơn vị của người dùng: dùng dữ liệu đơn vị sinh phép tính tương đương, so sánh (shadow), rồi bỏ cột scope. Ngược lại từ S2/S4 về S1 khi cần ngoại lệ hoặc ủy quyền chéo đơn vị.",
+   dg:{ nodes:{u:[0,0,"Principal","user"],a:[1,0,"Assignment\nrole + scope + hạn","asg"],r:[2,0,"Role","role"],p:[3,0,"Permission","perm"],s:[1,1,"scope: COMPANY a","scope"]}, edges:[["u","a"],["a","r"],["r","p"],["s","a","nằm ở đây"]] } },
+ { axis:"C", id:"S2", name:"S2 Role-permission-bound", short:"Permission + scope type trên role",
+   what:"Role chứa cặp (permission, scope type) như project.read ở mức DEPARTMENT. Đơn vị cụ thể suy ra từ vị trí tổ chức của người dùng.",
+   arch:"Role → (permission + scope_type) → phân giải bằng đơn vị của Principal.",
+   db:["role_permissions: role_id, permission_id, scope_type","principal_org_units: principal, tenant, loại đơn vị, unit_id (nguồn có thẩm quyền)"],
+   flow:["Lấy role hiệu lực và cặp (permission, scope_type) khớp","Phân giải scope_type thành giá trị bằng đơn vị của principal","Phủ resource hoặc sinh FilterPlan; không phân giải được thì INDETERMINATE"],
+   pros:["Ít dòng assignment","Scope tự theo người khi chuyển đơn vị","Dễ cache theo (role, đơn vị)"], cons:["Role nhân lên theo mức scope","Không có ngoại lệ theo người nếu thiếu cơ chế khác","Cần dữ liệu vị trí tổ chức tin cậy"],
+   trade:"Giảm dữ liệu cấp quyền, đổi lấy việc role gắn chặt với cấp tổ chức.",
+   use:"Role tương ứng một-một với cấp tổ chức, người dùng ít giữ role ở đơn vị khác.",
+   mig:"Sang S1 khi cần cấp role cho người ở đơn vị ngoài đơn vị của họ: tạo assignment S1 cho các ngoại lệ trước (hai cơ chế chạy song song theo hợp), rồi chuyển dần. Sang S4 nếu scope hoàn toàn suy ra từ thuộc tính.",
+   dg:{ nodes:{r:[0,0,"Role","role"],rp:[1,0,"permission + scope_type","perm"],pr:[2,0,"Phân giải","scope"],u:[2,1,"Đơn vị của Principal","user"]}, edges:[["r","rp"],["rp","pr"],["u","pr","unit_id"]] } },
+ { axis:"C", id:"S3", name:"S3 Permission-key-bound", short:"project.read.department",
+   what:"Scope là một phần khóa permission: project.read.own, project.read.department, project.read.company, project.read.all.",
+   arch:"Mỗi tổ hợp là một permission độc lập trong catalog; role chứa đúng những permission cần. Đơn vị cụ thể vẫn suy ra như S2 hoặc S4.",
+   db:["Như PM1; khóa có hậu tố scope, thêm cột scope_type","Lint kiểm khóa khớp cột"],
+   flow:["Yêu cầu chọn khóa theo mức scope cần","PDP tìm các permission cùng gốc principal nắm","Lấy scope rộng nhất hoặc hợp các scope"],
+   pros:["Tự mô tả, hiển thị rõ trên giao diện","Kiểm tra đơn giản","Không cần cột scope ở nơi khác"], cons:["Catalog phình theo resource x action x scope","Thêm scope phải migrate catalog","Dễ trùng lặp"],
+   trade:"Đơn giản và minh bạch với ít mức scope cố định; trả giá bằng kích thước catalog.",
+   use:"Ít mức scope và cố định (own/department/all); giao diện cần hiển thị quyền rõ.",
+   mig:"Sang S2 khi catalog phình: gộp project.read.* thành project.read cộng scope_type trên role-permission; viết bảng ánh xạ khóa cũ sang cặp mới và hỗ trợ cả hai trong giai đoạn chuyển tiếp.",
+   dg:{ nodes:{o:[0,0,"project.read.own","perm"],d:[0,1,"project.read.department","perm"],c:[0,2,"project.read.company","perm"],r:[1,1,"Role","role"],s:[2,1,"Scope suy ra\ntừ khóa","scope"]}, edges:[["o","r"],["d","r"],["c","r"],["r","s"]], w:190 } },
+ { axis:"C", id:"S4", name:"S4 Principal-attribute-derived", short:"Scope suy ra từ thuộc tính user",
+   what:"Scope suy ra lúc đánh giá từ thuộc tính hoặc membership của principal: công ty, phòng ban đang thuộc hoặc quản lý. Không lưu scope_id trong grant.",
+   arch:"PDP hỏi PIP (HR/IdP/bảng nội bộ) principal thuộc đơn vị nào, rồi sinh FilterPlan.",
+   db:["principal_org_units hoặc nguồn HR: principal, loại đơn vị, unit_id, quan hệ (thuộc về, quản lý), hiệu lực","Attribute registry: nguồn có thẩm quyền, độ tươi tối đa"],
+   flow:["Xác định grant (role → permission), scope khai báo là theo thuộc tính","Đọc đơn vị của principal từ nguồn có thẩm quyền (cache có hạn)","Phủ resource hoặc sinh FilterPlan; nguồn lỗi hoặc quá cũ thì INDETERMINATE"],
+   pros:["Không phải bảo trì dữ liệu scope","Người chuyển phòng ban đổi quyền ngay","Ít dòng phân công"], cons:["Phụ thuộc chất lượng nguồn thuộc tính","Khó trả lời ai cấp quyền này","Đổi nguồn HR tác động quyền mà không qua quy trình cấp quyền"],
+   trade:"Tự động hóa đổi lấy kiểm soát: cần audit và cảnh báo khi phạm vi đổi bất thường.",
+   use:"Có nguồn tổ chức/HR đáng tin; quyền theo đơn vị của tôi, hiếm ngoại lệ.",
+   mig:"Sang S1 (hybrid) khi cần cấp scope độc lập với HR (kiêm nhiệm, ủy quyền tạm). Cache key phải có epoch thuộc tính để thu hồi nhanh khi đổi đơn vị.",
+   dg:{ nodes:{pdp:[0,0,"PDP","role"],pip:[1,0,"PIP: HR / IdP","data"],sc:[2,0,"Scope","scope"],fp:[3,0,"FilterPlan","ok"]}, edges:[["pdp","pip","đơn vị của user?"],["pip","sc"],["sc","fp"]] } },
+ { axis:"C", id:"S5", name:"S5 Relationship-derived", short:"Sở hữu, thành viên, chia sẻ",
+   what:"Scope là tập resource mà principal có quan hệ với chúng: sở hữu, là thành viên team sở hữu, được chia sẻ. Gắn với M4.",
+   arch:"PDP hỏi kho quan hệ principal có quan hệ gì với resource nào, tạo scope động rồi FilterPlan.",
+   db:["Như M4: resource_relationships hoặc resource_acl, tenant bắt buộc, hiệu lực","Nguồn sự thật duy nhất cho mỗi quan hệ"],
+   flow:["Grant theo role cho hành động","Một resource: tải kèm tenant predicate, kiểm quan hệ","Danh sách: sinh điều kiện từ quan hệ dưới dạng FilterPlan","Không phân giải được quan hệ thì INDETERMINATE"],
+   pros:["Chính xác từng resource","Mô hình sở hữu và chia sẻ tự nhiên","Quyền đổi theo hành động chia sẻ"], cons:["Kho quan hệ và đánh giá phức tạp","Lọc danh sách lớn cần index và plan cẩn thận","Khó thấy tổng quan ai truy cập được gì"],
+   trade:"Tinh vi đổi lấy chi phí truy vấn và quản trị quan hệ; giữ giới hạn kích thước plan.",
+   use:"Nền tảng cộng tác, tài liệu, dự án; mô hình chủ sở hữu và người được mời.",
+   mig:"Từ S1 khi assignment RESOURCE chiếm phần lớn dòng: nhập thành bản ghi quan hệ, chạy song song rồi bỏ. Khi đồ thị quá lớn, cân nhắc engine ReBAC chuyên dụng (E3).",
+   dg:{ nodes:{u:[0,0,"Principal","user"],rel:[1,0,"owner / member / viewer","asg"],res:[2,0,"Resource","data"],fp:[1,1,"FilterPlan từ quan hệ","ok"]}, edges:[["u","rel"],["rel","res"],["rel","fp"]], w:170 } },
+ { axis:"C", id:"S6", name:"S6 Policy / Query-based", short:"Policy sinh điều kiện hoặc FilterPlan",
+   what:"Scope là kết quả của policy sinh điều kiện hoặc FilterPlan, ví dụ status = ACTIVE AND department_id IN user.managed_departments.",
+   arch:"Policy engine nhận thuộc tính và quan hệ rồi xuất điều kiện, dịch sang FilterPlan có kiểu.",
+   db:["Không có bảng scope riêng","Cần: policy bundle có phiên bản, attribute registry, danh sách trường và toán tử được phép trong FilterPlan"],
+   flow:["Policy được chọn theo permission (PM4) và đánh giá với thuộc tính","Một resource: kiểm điều kiện; danh sách: policy xuất điều kiện, dịch sang FilterPlan đã đăng ký kiểu và kiểm tra runtime","Plan sai kiểu hoặc không dịch được thì không truy vấn, trả lỗi (không fallback)"],
+   pros:["Linh hoạt nhất, không lưu dữ liệu scope","Điều kiện theo trạng thái, thời gian","Đổi chính sách không đổi dữ liệu"], cons:["Cần policy lifecycle, test, giải thích","Không phải điều kiện nào cũng dịch được sang plan an toàn","Khó dự đoán hiệu năng"],
+   trade:"Biểu đạt tối đa đổi lấy độ phức tạp vận hành; nên đặt lên trên một pattern khác thay vì dùng một mình.",
+   use:"Quyền theo trạng thái bản ghi, phân loại, mức xác thực; kết hợp S1 hoặc S4 cho phần tổ chức.",
+   mig:"Từ S1/S4 khi có điều kiện không biểu diễn được bằng đơn vị: thêm điều kiện thành ràng buộc ở M3 và giữ cách gắn cũ; chỉ chuyển toàn bộ sang S6 khi hầu hết quy tắc đã nằm trong policy.",
+   dg:{ nodes:{pol:[0,0,"Policy","asg"],attr:[0,1,"Thuộc tính, quan hệ","data"],cond:[1,0,"Điều kiện","scope"],fp:[2,0,"FilterPlan có kiểu","ok"],rt:[3,0,"Kiểm tra runtime","deny"]}, edges:[["pol","cond"],["attr","cond","","dash"],["cond","fp"],["fp","rt"]] } },
+
+ /* ---- Trục D ---- */
+ { axis:"D", id:"R1", name:"R1 User → Role", short:"Gán role trực tiếp cho người",
+   what:"Role được gán trực tiếp cho từng principal.",
+   arch:"Principal → assignment → Role. Quản trị viên thao tác trên từng người.",
+   db:["role_assignments: tenant, principal, role, hiệu lực, trạng thái, người cấp, mã phê duyệt (cộng cột scope nếu dùng S1)","Role phải thuộc hệ thống hoặc đúng tenant; chỉ gán cho membership ACTIVE"],
+   flow:["Lấy assignment hiệu lực của principal (membership ACTIVE, trong thời hạn, role dùng được trong tenant)","Hợp permission"],
+   pros:["Đơn giản nhất, nguồn gốc quyền rõ","Dễ audit từng người"], cons:["Quản trị nặng khi số người lớn","Khó đồng bộ khi tổ chức đổi"],
+   trade:"Rõ ràng đổi lấy chi phí thao tác khi quy mô tăng.",
+   use:"Tổ chức nhỏ đến vừa, ít nhóm, số người quản lý được thủ công hoặc qua API.",
+   mig:"Sang R2 khi quản trị theo người thành gánh nặng hoặc cần đồng bộ từ IdP; sang R3 khi quyền theo cơ cấu tổ chức. Giữ R1 cho ngoại lệ; nguồn quyền được hợp nên chuyển dần không mất quyền.",
+   dg:{ nodes:{u:[0,0,"Principal","user"],a:[1,0,"Assignment","asg"],r:[2,0,"Role","role"]}, edges:[["u","a"],["a","r"]] } },
+ { axis:"D", id:"R2", name:"R2 Group → Role", short:"Role qua nhóm, đồng bộ từ IdP",
+   what:"Role gán cho nhóm; người dùng kế thừa role qua thành viên nhóm.",
+   arch:"Principal → membership nhóm → Group → group assignment → Role. Nhóm có thể đồng bộ từ Identity Provider.",
+   db:["groups: id, tenant, nguồn (nội bộ hoặc IdP), trạng thái","group_memberships: group, principal, hiệu lực","group_role_assignments: group, role, hiệu lực (và scope nếu dùng S1)"],
+   flow:["Tìm các nhóm hiệu lực của principal","Tìm assignment hiệu lực của các nhóm đó","Hợp với assignment trực tiếp rồi đánh giá; ghi nguồn của từng grant"],
+   pros:["Quản trị theo nhóm, dễ đồng bộ IdP","Thêm người vào nhóm là đủ"], cons:["Khó trả lời vì sao có quyền khi thuộc nhiều nhóm","Đổi thành viên nhóm đổi quyền ngầm, cần audit"],
+   trade:"Quản trị nhẹ đổi lấy truy vết khó; ghi rõ nguồn grant trong decision log.",
+   use:"Tổ chức dùng IdP/AD, quản trị theo nhóm chức năng.",
+   mig:"Từ R1 khi nhiều người có cùng tập role: tạo nhóm, gán role cho nhóm, bỏ assignment trực tiếp trùng. Cache phải hủy theo sự kiện đổi membership nhóm.",
+   dg:{ nodes:{u:[0,0,"Principal","user"],g:[1,0,"Group","asg"],r:[2,0,"Role","role"],idp:[1,1,"IdP / AD","sys"]}, edges:[["u","g","thành viên"],["g","r","được gán"],["idp","g","đồng bộ","dash"]] } },
+ { axis:"D", id:"R3", name:"R3 Org Unit → Role", short:"Role theo vị trí trong tổ chức",
+   what:"Role gán cho đơn vị tổ chức; người nhận role theo vị trí hoặc membership trong đơn vị.",
+   arch:"Principal → vị trí trong đơn vị → OrgUnit → ánh xạ → Role. Hay đi cùng S2/S4 vì scope tự theo đơn vị.",
+   db:["org_units: id, tenant, loại, cha","org_unit_positions: principal, unit, chức danh, hiệu lực","org_unit_role_mappings: loại đơn vị hoặc chức danh, role"],
+   flow:["Xác định vị trí hiệu lực của principal","Ánh xạ vị trí thành role","Phạm vi thường là chính đơn vị đó; hợp với các nguồn khác rồi đánh giá"],
+   pros:["Khớp cơ cấu tổ chức","Ít thao tác cấp quyền thủ công"], cons:["Phụ thuộc dữ liệu cơ cấu chính xác","Sáp nhập, tách đơn vị phải xử lý hiệu lực"],
+   trade:"Tự động hóa đổi lấy phụ thuộc dữ liệu tổ chức; cần quy trình duyệt khi đổi cơ cấu.",
+   use:"Doanh nghiệp có cơ cấu rõ, chức danh quyết định quyền.",
+   mig:"Từ R1/R2 khi quyền suy ra được từ chức danh. Giữ R1 cho ngoại lệ (hybrid). Xử lý thời điểm hiệu lực khi điều chuyển để không có khoảng hở quyền.",
+   dg:{ nodes:{u:[0,0,"Principal","user"],pos:[1,0,"Vị trí / chức danh","asg"],ou:[2,0,"Org Unit","scope"],r:[3,0,"Role","role"]}, edges:[["u","pos"],["pos","ou"],["ou","r","ánh xạ"]] } },
+ { axis:"D", id:"R4", name:"R4 Hybrid", short:"Kết hợp nhiều kênh gán",
+   what:"Kết hợp R1, R2, R3: tùy loại quyền mà chọn kênh gán phù hợp.",
+   arch:"Các nguồn grant được gom thành một tập grant hiệu lực duy nhất trước khi đánh giá; mỗi grant mang nhãn nguồn.",
+   db:["Các bảng của R1, R2, R3 cần dùng","Khung nhìn hợp nhất hoặc bước hợp nhất trong PDP; cột source (DIRECT, GROUP, ORG_UNIT)"],
+   flow:["Thu thập grant từ mọi nguồn hiệu lực","Hợp, loại grant không còn hiệu lực","Đánh giá; ghi nguồn vào decision log"],
+   pros:["Mỗi nhu cầu dùng kênh tự nhiên nhất","Phù hợp nhiều nguồn danh tính và cơ cấu"], cons:["Nhiều nguồn, khó giải thích và test","Cache và thu hồi phải xét mọi nguồn"],
+   trade:"Linh hoạt đổi lấy độ phức tạp; cần công cụ trả lời vì sao người này có quyền X.",
+   use:"Doanh nghiệp lớn có IdP, cơ cấu tổ chức và ngoại lệ cá nhân cùng tồn tại.",
+   mig:"Đạt được dần từ R1 bằng cách thêm từng kênh. Nếu quá khó vận hành, thu gọn về hai kênh và ghi lại trong ADR.",
+   dg:{ nodes:{d:[0,0,"R1 Trực tiếp","asg"],g:[0,1,"R2 Nhóm","asg"],o:[0,2,"R3 Đơn vị","asg"],m:[1,1,"Hợp grant\n(nhãn nguồn)","sys"],r:[2,1,"Đánh giá","role"]}, edges:[["d","m"],["g","m"],["o","m"],["m","r"]] } },
+
+ /* ---- Trục E ---- */
+ { axis:"E", id:"E1", name:"E1 In-application", short:"Mỗi ứng dụng tự kiểm tra",
+   what:"Mỗi ứng dụng tự kiểm tra quyền trong backend. PEP và PDP là hai module tách bạch trong cùng ứng dụng.",
+   arch:"Middleware/service layer gọi module PDP cục bộ; data layer thêm tenant predicate và FilterPlan; dữ liệu phân quyền cùng database với dữ liệu ứng dụng.",
+   db:["Bảng phân quyền (principals, memberships, roles, permissions, assignments, audit outbox) cùng database với dữ liệu nghiệp vụ nên ghi audit cùng giao dịch được"],
+   flow:["Request → xác thực → context builder → resource resolver (tenant predicate)","PDP cục bộ đánh giá","PEP áp quyết định và obligation","Data layer thực thi"],
+   pros:["Đơn giản, không thêm dịch vụ, không độ trễ mạng","Audit và dữ liệu cùng giao dịch","Dễ debug"], cons:["Logic dễ trùng lặp khi nhiều ứng dụng","Khó đồng bộ chính sách giữa ứng dụng","Mỗi ứng dụng tự gánh cache và test"],
+   trade:"Đơn giản đổi lấy khó chia sẻ. Phù hợp một ứng dụng hoặc ít ứng dụng độc lập.",
+   use:"Một ứng dụng hoặc modular monolith; điểm xuất phát chuẩn.",
+   mig:"Sang E2 khi có từ hai ứng dụng cùng ngôn ngữ cần cùng logic. Chuẩn bị từ đầu: giữ PDP sau một interface ổn định (check, resolveDataScope).",
+   dg:{ nodes:{app:[0,0,"Ứng dụng + PEP","sys"],pdp:[1,0,"Module PDP nội bộ","role"],db:[2,0,"Database chung","data"]}, edges:[["app","pdp"],["pdp","db"],["app","db","dữ liệu nghiệp vụ"]] } },
+ { axis:"E", id:"E2", name:"E2 Shared Library", short:"Thư viện PDP dùng chung",
+   what:"Logic PDP đóng gói thành thư viện dùng chung giữa các module hoặc service.",
+   arch:"Mỗi service nhúng thư viện, nạp dữ liệu phân quyền (database dùng chung hoặc API đọc) và tự đánh giá tại chỗ.",
+   db:["Dữ liệu phân quyền ở database dùng chung hoặc sao chép sang từng service; xác định rõ nguồn sự thật","Mỗi service giữ cache riêng với khóa đủ chiều và hủy theo sự kiện"],
+   flow:["Như E1 nhưng PDP là thư viện có phiên bản","Không có network call cho mỗi lần kiểm tra"],
+   pros:["Tái sử dụng logic, không độ trễ mạng cho quyết định","Không có điểm nghẽn tập trung","Thống nhất hành vi nếu cùng phiên bản"], cons:["Quản lý phiên bản; service cũ có thể chạy logic cũ","Dữ liệu và cache vẫn phân tán","Chỉ dùng cho cùng hệ sinh thái ngôn ngữ"],
+   trade:"Giảm trùng lặp mà không thêm dịch vụ, đổi lấy kỷ luật phiên bản và đồng bộ dữ liệu.",
+   use:"Nhiều service cùng ngôn ngữ, cùng mô hình phân quyền, đội kiểm soát được việc nâng phiên bản.",
+   mig:"Sang E3 khi có nhiều ngôn ngữ, cần phát hành chính sách tập trung, hoặc không ép được nâng phiên bản đồng loạt: bọc thư viện thành service, giữ interface check/resolveDataScope.",
+   dg:{ nodes:{s1:[0,0,"Service 1 + thư viện","sys"],s2:[0,1,"Service 2 + thư viện","sys"],db:[1,0,"Dữ liệu phân quyền","data"],c:[1,1,"Cache riêng mỗi service","sys"]}, edges:[["s1","db"],["s2","db"],["s2","c","","dash"]], w:180 } },
+ { axis:"E", id:"E3", name:"E3 Centralized Service", short:"Dịch vụ phân quyền tập trung",
+   what:"Các ứng dụng gọi một service tập trung để kiểm tra quyền; service sở hữu PDP và thường PAP, policy bundle.",
+   arch:"PEP ở từng ứng dụng gọi service qua API; service có PIP truy cập dữ liệu và cache riêng; policy phát hành tập trung.",
+   db:["Dữ liệu phân quyền thuộc service; ứng dụng giữ dữ liệu nghiệp vụ và khóa tổ chức trên resource","Audit quyết định do service ghi; thay đổi nghiệp vụ vẫn ghi ở ứng dụng","Cần sự kiện hủy cache khi đổi quyền"],
+   flow:["PEP gửi (principal, action, resource, context) tới service","Service trả quyết định, obligation, FilterPlan","Ứng dụng áp tenant predicate và plan (service không sinh SQL)","Service không khả dụng thì từ chối (503)"],
+   pros:["Thống nhất quyết định giữa nhiều ứng dụng, ngôn ngữ","Policy quản lý và phát hành tập trung","Một nơi để audit và quan sát"], cons:["Độ trễ mạng; cần khả dụng và mở rộng","Nguy cơ điểm nghẽn, điểm lỗi chung","Ranh giới giao dịch với audit khó hơn"],
+   trade:"Tập trung và nhất quán đổi lấy độ khả dụng, độ trễ, chi phí vận hành. Định nghĩa SLA, timeout, breaker, fail closed.",
+   use:"Nhiều ứng dụng, nhiều ngôn ngữ, yêu cầu chính sách tập trung và tuân thủ.",
+   mig:"Từ E1/E2 khi số ứng dụng hoặc ngôn ngữ vượt khả năng đồng bộ thư viện: chuyển từng ứng dụng, chạy song song so sánh. Nếu độ trễ không chấp nhận được, quay về E2 cho đường nóng (cache theo epoch).",
+   dg:{ nodes:{a1:[0,0,"App 1 + PEP","sys"],a2:[0,1,"App 2 + PEP","sys"],a3:[0,2,"App 3 + PEP","sys"],svc:[1,1,"Authorization Service\nPDP + PAP","role"],pip:[2,1,"Dữ liệu và policy","data"]}, edges:[["a1","svc","mạng"],["a2","svc"],["a3","svc"],["svc","pip"]], w:170 } },
+ { axis:"E", id:"E+", name:"E+ Database RLS", short:"Lớp phòng thủ sâu (bổ sung)",
+   what:"Không thay E1 đến E3 mà đặt cạnh chúng: cơ sở dữ liệu tự áp điều kiện tenant (và có thể scope) qua chính sách RLS.",
+   arch:"Ứng dụng đặt tenant context cho mỗi giao dịch; database lọc dòng theo chính sách. Authorization ở ứng dụng vẫn là nguồn quyết định.",
+   db:["Cột tenant_id bắt buộc","Chính sách RLS theo bảng","Role ứng dụng không bypass RLS và không là chủ sở hữu bảng"],
+   flow:["Ứng dụng đặt và xóa context theo giao dịch (connection pool không rò context)","RLS chặn truy vấn sai tenant ngay cả khi mã ứng dụng có lỗi"],
+   pros:["Chặn rò rỉ tenant do lỗi ứng dụng","Là lớp bảo vệ độc lập"], cons:["Phức tạp vận hành (pool, migration, hiệu năng)","Không thay authorization ở ứng dụng; scope phức tạp khó diễn đạt trong RLS"],
+   trade:"Thêm an toàn cho cô lập tenant, đổi lấy phức tạp vận hành.",
+   use:"Yêu cầu cô lập tenant nghiêm ngặt hoặc quy định tuân thủ.",
+   mig:"Thêm vào bất kỳ hồ sơ nào khi cần thêm một lớp; bắt đầu với tenant predicate, chưa đưa scope vào RLS. Nếu không dùng, ghi biện pháp thay thế vào ADR.",
+   dg:{ nodes:{app:[0,0,"Ứng dụng\nđặt tenant context","sys"],rls:[1,0,"Chính sách RLS","deny"],tbl:[2,0,"Bảng có tenant_id","data"]}, edges:[["app","rls"],["rls","tbl","lọc dòng"]] } }
+];
+
+/* ---------- Dựng giao diện ---------- */
+function esc(s) { return String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+const $ = id => document.getElementById(id);
+
+$("principleGrid").innerHTML = PRINCIPLES.map((p, i) =>
+  `<div class="card principle"><b>${i + 1}</b><div><b style="color:var(--text)">${esc(p[0])}</b><div style="color:var(--muted);font-size:14px">${esc(p[1])}</div></div></div>`).join("");
+$("compBody").innerHTML = COMPONENTS.map(c => `<tr><td>${esc(c[0])}</td><td>${esc(c[1])}</td><td>${esc(c[2])}</td></tr>`).join("");
+$("invBody").innerHTML = INVARIANTS.map((t, i) => `<tr><td>${i + 1}</td><td>${esc(t)}</td></tr>`).join("");
+$("checklist").innerHTML = CHECKLIST.map((t, i) => `<li><input type="checkbox" id="ck${i}"><label for="ck${i}">${esc(t)}</label></li>`).join("");
+
+drawDiagram($("dgFlow"), FLOW);
+legend($("lgFlow"), ["user", "sys", "role", "data", "asg"]);
+drawDiagram($("dgTenant"), TENANT);
+drawDiagram($("dgER"), ER);
+drawDiagram($("dgPhases"), PHASES);
+drawDiagram($("dgFilter"), FILTER);
+drawDiagram($("dgAxes"), AXES_DG);
+
+/* Tabs trục + chọn option */
+let curAxis = "A", curOpt = "M1";
+function renderAxes() {
+  $("axisTabs").innerHTML = AXES.map(a =>
+    `<button type="button" role="tab" data-axis="${a.id}" aria-selected="${a.id === curAxis}">${esc(a.name)}</button>`).join("");
+  $("axisTabs").querySelectorAll("button").forEach(b => b.onclick = () => {
+    curAxis = b.dataset.axis;
+    curOpt = OPTS.find(o => o.axis === curAxis).id;
+    renderAxes();
+  });
+  const axis = AXES.find(a => a.id === curAxis);
+  const list = OPTS.filter(o => o.axis === curAxis);
+  $("optPick").innerHTML = `<div style="grid-column:1/-1;color:var(--muted);font-size:14px">${esc(axis.q)}</div>` + list.map(o =>
+    `<button type="button" class="opt" data-id="${o.id}" aria-pressed="${o.id === curOpt}"><b>${esc(o.name)}</b><small>${esc(o.short)}</small></button>`).join("");
+  $("optPick").querySelectorAll(".opt").forEach(b => b.onclick = () => { curOpt = b.dataset.id; renderAxes(); });
+  renderDetail(list.find(o => o.id === curOpt));
+  $("cmpTable").innerHTML = `<thead><tr><th>Pattern</th><th>Ưu điểm chính</th><th>Nhược điểm chính</th><th>Phù hợp khi</th></tr></thead><tbody>` +
+    list.map(o => `<tr><td>${esc(o.name)}</td><td>${esc(o.pros[0])}</td><td>${esc(o.cons[0])}</td><td>${esc(o.use)}</td></tr>`).join("") + "</tbody>";
+}
+function renderDetail(o) {
+  const li = a => a.map(x => `<li>${esc(x)}</li>`).join("");
+  $("optDetail").innerHTML = `
+    <div>
+      <h3>${esc(o.name)}</h3>
+      <div class="diagram" id="dgOpt"></div>
+      <div class="legend" id="lgOpt"></div>
+      <div class="field"><h5>2. Architecture</h5><p>${esc(o.arch)}</p></div>
+      <div class="field"><h5>3. Database Model</h5><ul>${li(o.db)}</ul></div>
+      <div class="field"><h5>4. Authorization Flow</h5><ol>${li(o.flow)}</ol></div>
+    </div>
+    <div>
+      <div class="field" style="margin-top:0"><h5>1. What</h5><p>${esc(o.what)}</p></div>
+      <div class="field"><h5>5. Advantages / Disadvantages</h5>
+        <div class="pc"><div class="pro"><h5>Ưu điểm</h5><ul>${li(o.pros)}</ul></div><div class="con"><h5>Nhược điểm</h5><ul>${li(o.cons)}</ul></div></div></div>
+      <div class="field"><h5>6. Trade-offs</h5><p>${esc(o.trade)}</p></div>
+      <div class="field"><h5>7. Suitable Use Cases</h5><p>${esc(o.use)}</p></div>
+      <div class="field"><h5>8. Migration Path</h5><div class="mig">${esc(o.mig)}</div></div>
+    </div>`;
+  drawDiagram($("dgOpt"), Object.assign({ title: o.name }, o.dg));
+  const kinds = [...new Set(Object.values(o.dg.nodes).map(n => n[3]))];
+  legend($("lgOpt"), kinds);
+}
+renderAxes();
+
+/* ---------- Ghép hồ sơ ---------- */
+const PRESETS = {
+  "Hồ sơ khởi đầu": { A: "M1", B: "PM1", C: "S1", D: "R1", E: "E1" },
+  "Ứng dụng nội bộ nhỏ": { A: "M1", B: "PM1", C: "none", D: "R1", E: "E1" },
+  "Doanh nghiệp nhiều công ty": { A: "M3", B: "PM2", C: "S4", D: "R4", E: "E3" },
+  "Nền tảng cộng tác": { A: "M4", B: "PM1", C: "S5", D: "R2", E: "E1" }
+};
+let profile = Object.assign({}, PRESETS["Hồ sơ khởi đầu"]);
+function renderBuilder() {
+  $("presets").innerHTML = Object.keys(PRESETS).map(k => `<button type="button" data-p="${esc(k)}">${esc(k)}</button>`).join("");
+  $("presets").querySelectorAll("button").forEach(b => b.onclick = () => { profile = Object.assign({}, PRESETS[b.dataset.p]); renderBuilder(); });
+  $("builderSel").innerHTML = AXES.map(a => {
+    const opts = OPTS.filter(o => o.axis === a.id).map(o => `<option value="${o.id}" ${profile[a.id] === o.id ? "selected" : ""}>${esc(o.name)}</option>`);
+    if (a.id === "C") opts.unshift(`<option value="none" ${profile.C === "none" ? "selected" : ""}>Không cần giới hạn dữ liệu</option>`);
+    return `<div><label for="sel${a.id}">${esc(a.name)}</label><select id="sel${a.id}" data-axis="${a.id}">${opts.join("")}</select></div>`;
+  }).join("");
+  $("builderSel").querySelectorAll("select").forEach(s => s.onchange = () => { profile[s.dataset.axis] = s.value; renderBuilder(); });
+  const nodes = {}, edges = [];
+  AXES.forEach((a, i) => {
+    const o = OPTS.find(x => x.id === profile[a.id]);
+    const kind = { A: "role", B: "perm", C: "scope", D: "asg", E: "sys" }[a.id];
+    nodes[a.id] = [i, 0, o ? o.id : "Không", kind, a.name.replace(/^[A-E]\. /, "")];
+    if (i) edges.push([AXES[i - 1].id, a.id]);
+  });
+  nodes.inv = [0, 1, "10 bất biến chung", "ok", "mọi tổ hợp đều phải giữ"];
+  nodes.out = [4, 1, "Contract chung", "ok", "ALLOW/DENY + FilterPlan"];
+  drawDiagram($("dgProfile"), { title: "Hồ sơ đã chọn", w: 170, h: 54, gx: 56, gy: 30, nodes, edges: edges.concat([["inv", "out", "cùng một contract", "dash"]]) });
+  renderNotes();
+}
+function renderNotes() {
+  const p = profile, n = [];
+  const add = (cls, t) => n.push(`<div class="note ${cls}">${esc(t)}</div>`);
+  if (p.A === "M1" && p.B === "PM1" && p.D === "R1" && p.E === "E1" && (p.C === "S1" || p.C === "none"))
+    add("good", "Khớp hồ sơ tham chiếu: có mô tả dữ liệu và thuật toán đầy đủ ở Reference Architecture.");
+  else add("info", "Tổ hợp này vượt ra ngoài hồ sơ tham chiếu: hãy viết test riêng cho scope, hết hạn, thu hồi, chéo tenant, danh sách, bulk và lỗi phụ thuộc.");
+  if (p.A === "M2") add("info", "M2: cần cấm vòng lặp trong hierarchy và hủy cache khi hierarchy đổi.");
+  if (p.A === "M3" || p.A === "M5") add("info", "Cần attribute registry và nguồn thuộc tính tin cậy; thuộc tính thiếu phải cho kết quả INDETERMINATE.");
+  if (p.A === "M5" && p.E === "E1") add("warn", "M5 (policy engine) thường đi cùng E3, hoặc E2 nhúng engine; E1 chỉ hợp nếu một ứng dụng duy nhất dùng policy.");
+  if (p.A === "M4" && p.C !== "S5") add("warn", "M4 (quan hệ) hợp nhất với S5; nếu giữ scope khác, cần nói rõ quan hệ chỉ bổ sung thêm cho hành động nào.");
+  if (p.C === "S5" && p.A !== "M4") add("warn", "S5 dựa trên kho quan hệ, nên đi cùng M4.");
+  if (p.C === "S6" && !(p.A === "M3" || p.A === "M5") ) add("warn", "S6 cần ABAC hoặc policy: hãy chọn M3 hoặc M5 ở trục A.");
+  if (p.C === "S3" && p.B === "PM4") add("warn", "S3 (scope trong khóa) không đi cùng PM4 (policy thay cho scope cố định).");
+  if ((p.C === "S2" || p.C === "S4") && p.D === "R1") add("info", "S2/S4 suy ra scope từ đơn vị người dùng: hãy chắc có nguồn vị trí tổ chức tin cậy; R3 thường khớp tự nhiên hơn R1.");
+  if (p.D === "R2" || p.D === "R3" || p.D === "R4") add("info", "Phải ghi nguồn của từng grant (trực tiếp, nhóm, đơn vị) để trả lời được vì sao người này có quyền.");
+  if (p.E === "E3") add("info", "E3: định nghĩa SLA, timeout, breaker và hành vi fail closed khi service không khả dụng.");
+  if (p.E === "E2") add("info", "E2: kỷ luật phiên bản thư viện; cache key và hủy cache phải nhất quán giữa các service.");
+  $("profileNotes").innerHTML = n.join("");
+}
+renderBuilder();
+
+/* ---------- Giao diện sáng/tối ---------- */
+$("themeBtn").onclick = () => {
+  const r = document.documentElement, cur = r.getAttribute("data-theme");
+  const sysDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const next = cur ? (cur === "dark" ? "light" : "dark") : (sysDark ? "light" : "dark");
+  r.setAttribute("data-theme", next);
+};
+</script>
+</body>
+</html>
